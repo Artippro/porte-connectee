@@ -90,6 +90,16 @@
     .back-link:hover { color: white; }
 
     /* === CONTROLE ADMIN === */
+    .welcome-msg {
+      font-size: 1.1em;
+      margin-bottom: 15px;
+      padding: 10px 16px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2));
+      border: 1px solid rgba(102,126,234,0.3);
+    }
+    .welcome-msg .name { color: #667eea; font-weight: 900; }
+    .welcome-msg .role { font-size: 0.75em; opacity: 0.6; display: block; margin-top: 2px; }
     .status {
       font-size: 1.05em;
       margin: 15px 0;
@@ -146,6 +156,7 @@
       border-top: 1px solid rgba(255,255,255,0.1);
       color: #f093fb;
     }
+    .section-title.gold { color: #ffc800; }
     .btn-generate {
       background: linear-gradient(135deg, #f093fb, #f5576c);
       padding: 14px;
@@ -241,6 +252,71 @@
     .result-msg.success { background: rgba(0,255,100,0.15); color: #00ff64; }
     .result-msg.fail { background: rgba(255,50,50,0.15); color: #ff5050; }
     .result-msg.checking { background: rgba(255,200,0,0.15); color: #ffc800; }
+
+    /* === POPUP MODAL === */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      animation: fadeIn 0.2s;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border-radius: 20px;
+      padding: 30px;
+      width: 90%;
+      max-width: 360px;
+      box-shadow: 0 10px 50px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .modal h2 { font-size: 1.2em; margin-bottom: 20px; }
+    .modal-input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      font-size: 1em;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .modal-input:focus { border-color: #667eea; }
+    .modal-input::placeholder { color: rgba(255,255,255,0.3); }
+    .modal-btns { display: flex; gap: 10px; margin-top: 8px; }
+    .modal-btns button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1em;
+      cursor: pointer;
+      color: white;
+    }
+    .modal-btns .btn-cancel { background: rgba(255,255,255,0.1); }
+    .modal-btns .btn-confirm { background: linear-gradient(135deg, #667eea, #764ba2); }
+
+    /* === ADMIN LIST === */
+    .admin-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      margin: 5px 0;
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+      text-align: left;
+    }
+    .admin-item .admin-info { flex: 1; }
+    .admin-item .admin-name { font-weight: 700; font-size: 0.95em; }
+    .admin-item .admin-pin { font-family: monospace; opacity: 0.5; font-size: 0.8em; letter-spacing: 2px; }
   </style>
 </head>
 <body>
@@ -313,8 +389,10 @@
   <!-- ========== ECRAN 3 : CONTROLE ADMIN ========== -->
   <div class="screen hidden" id="controlScreen">
     <div class="icon" id="adminIcon">🔒</div>
-    <h1>Panneau Admin</h1>
-    <div class="subtitle">Controle total</div>
+    <div class="welcome-msg" id="welcomeMsg">
+      Bienvenue <span class="name" id="welcomeName">Admin</span>
+      <span class="role" id="welcomeRole"></span>
+    </div>
 
     <div class="status waiting" id="status">Connexion en cours...</div>
 
@@ -335,14 +413,36 @@
     <div class="code-list" id="codeList"></div>
     <div class="back-link" onclick="clearHistory()" style="margin-top:10px;color:rgba(255,50,50,0.4);">🗑 Vider l'historique</div>
 
+    <!-- SECTION GESTION ADMINS (super admin only) -->
+    <div id="superAdminSection" class="hidden">
+      <div class="section-title gold">👑 Gestion des Admins</div>
+      <button class="btn" style="background:linear-gradient(135deg,#667eea,#764ba2);" onclick="showCreateAdminModal()">+ Creer un admin</button>
+      <div id="adminList" class="code-list"></div>
+    </div>
+
     <div class="back-link" onclick="location.reload()">🚪 Deconnexion</div>
+  </div>
+
+  <!-- ========== MODAL CREER ADMIN ========== -->
+  <div class="modal-overlay hidden" id="createAdminModal">
+    <div class="modal">
+      <h2>👑 Nouvel Admin</h2>
+      <input class="modal-input" id="newAdminName" type="text" placeholder="Nom (ex: Thomas)" maxlength="20" autocomplete="off">
+      <input class="modal-input" id="newAdminPin" type="tel" placeholder="Code PIN (4 chiffres)" maxlength="4" autocomplete="off">
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="hideCreateAdminModal()">Annuler</button>
+        <button class="btn-confirm" onclick="createAdmin()">Creer</button>
+      </div>
+      <div class="error-msg" id="modalError" style="text-align:center;"></div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script>
-    // ===== CODE PIN ADMIN (4 chiffres) =====
-    const CODE_PIN = '1234';
-    // ========================================
+    // ===== SUPER ADMIN PIN =====
+    const SUPER_ADMIN_PIN = '1234';
+    const SUPER_ADMIN_NAME = 'Super Admin';
+    // ============================
 
     // MQTT topics
     const topicCmd        = 'porte-vincent-2026/commande';
@@ -352,13 +452,30 @@
     const topicCodeResult = 'porte-vincent-2026/coderesult';
     const topicCodeUsed   = 'porte-vincent-2026/codeused';
     const topicDelCode    = 'porte-vincent-2026/delcode';
-    const topicHistory    = 'porte-vincent-2026/history';  // retained: historique partage
+    const topicHistory    = 'porte-vincent-2026/history';
+    const topicAdmins     = 'porte-vincent-2026/admins';  // retained: liste des admins
 
     let client = null;
     let guestClient = null;
+    let isSuperAdmin = false;
+    let currentUserName = '';
 
-    // Historique des codes : { code: '123456', status: 'waiting'|'used', time: '14:32' }
-    // Charge depuis localStorage si dispo
+    // ===== ADMIN ACCOUNTS =====
+    // { pin: '5678', name: 'Thomas' }
+    let adminAccounts = [];
+    try {
+      const saved = localStorage.getItem('porte_admins');
+      if (saved) adminAccounts = JSON.parse(saved);
+    } catch(e) {}
+
+    function saveAdmins() {
+      try { localStorage.setItem('porte_admins', JSON.stringify(adminAccounts)); } catch(e) {}
+      if (client && client.connected) {
+        client.publish(topicAdmins, JSON.stringify(adminAccounts), { retain: true });
+      }
+    }
+
+    // ===== CODE HISTORY =====
     let codeHistory = [];
     try {
       const saved = localStorage.getItem('porte_codeHistory');
@@ -367,7 +484,6 @@
 
     function saveHistory() {
       try { localStorage.setItem('porte_codeHistory', JSON.stringify(codeHistory)); } catch(e) {}
-      // Publier sur MQTT en retained → tous les appareils le recoivent
       if (client && client.connected) {
         client.publish(topicHistory, JSON.stringify(codeHistory), { retain: true });
       }
@@ -399,25 +515,46 @@
       }
     }
     function checkPin() {
-      if (pinInput === CODE_PIN) {
-        showScreen('controlScreen');
-        updateCodeList(); // Afficher l'historique sauvegarde
-        connectAdminMQTT();
+      // Check super admin
+      if (pinInput === SUPER_ADMIN_PIN) {
+        isSuperAdmin = true;
+        currentUserName = SUPER_ADMIN_NAME;
+        loginSuccess();
+        return;
+      }
+      // Check created admins
+      const admin = adminAccounts.find(a => a.pin === pinInput);
+      if (admin) {
+        isSuperAdmin = false;
+        currentUserName = admin.name;
+        loginSuccess();
+        return;
+      }
+      // Wrong PIN
+      attempts++;
+      for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'pin-dot error';
+      if (attempts >= maxAttempts) {
+        document.getElementById('errorMsg').textContent = 'Trop de tentatives. Rechargez la page.';
+        document.querySelectorAll('#pinScreen .key').forEach(k => k.disabled = true);
       } else {
-        attempts++;
-        for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'pin-dot error';
-        if (attempts >= maxAttempts) {
-          document.getElementById('errorMsg').textContent = 'Trop de tentatives. Rechargez la page.';
-          document.querySelectorAll('.key').forEach(k => k.disabled = true);
-        } else {
-          document.getElementById('errorMsg').textContent = 'Code incorrect (' + (maxAttempts - attempts) + ' essais restants)';
-          setTimeout(() => { pinInput = ''; updateDots(); }, 600);
-        }
+        document.getElementById('errorMsg').textContent = 'Code incorrect (' + (maxAttempts - attempts) + ' essais restants)';
+        setTimeout(() => { pinInput = ''; updateDots(); }, 600);
       }
     }
 
-    // ===== MQTT ADMIN =====
+    function loginSuccess() {
+      showScreen('controlScreen');
+      // Welcome message
+      document.getElementById('welcomeName').textContent = currentUserName;
+      document.getElementById('welcomeRole').textContent = isSuperAdmin ? '👑 Super Admin' : '🔑 Admin';
+      // Show/hide super admin section
+      document.getElementById('superAdminSection').classList.toggle('hidden', !isSuperAdmin);
+      updateCodeList();
+      updateAdminList();
+      connectAdminMQTT();
+    }
 
+    // ===== MQTT ADMIN =====
     function connectAdminMQTT() {
       client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
         clientId: 'admin-porte-' + Math.random().toString(36).substr(2, 8),
@@ -436,6 +573,7 @@
         client.subscribe(topicCodeUsed);
         client.subscribe(topicAddCode);
         client.subscribe(topicHistory);
+        client.subscribe(topicAdmins);
       });
       client.on('message', function(topic, message) {
         const msg = message.toString();
@@ -445,28 +583,34 @@
           try {
             const remoteHistory = JSON.parse(msg);
             if (Array.isArray(remoteHistory) && remoteHistory.length > 0) {
-              // Fusionner : garder tous les codes uniques, prendre le statut le plus recent
               const merged = new Map();
-              // D'abord les codes distants
               remoteHistory.forEach(c => merged.set(c.code, c));
-              // Puis les locaux (ecrase si plus recent)
               codeHistory.forEach(c => {
                 const existing = merged.get(c.code);
                 if (!existing) merged.set(c.code, c);
                 else if (c.status === 'used' && existing.status === 'waiting') merged.set(c.code, c);
               });
               codeHistory = Array.from(merged.values());
-              // Trier par time decroissant
               try { localStorage.setItem('porte_codeHistory', JSON.stringify(codeHistory)); } catch(e) {}
               updateCodeList();
             }
           } catch(e) {}
         }
-        // Un code vient d'etre utilise → mettre a jour l'historique
+        // Admin accounts synced from cloud
+        else if (topic === topicAdmins) {
+          try {
+            const remoteAdmins = JSON.parse(msg);
+            if (Array.isArray(remoteAdmins)) {
+              adminAccounts = remoteAdmins;
+              try { localStorage.setItem('porte_admins', JSON.stringify(adminAccounts)); } catch(e) {}
+              updateAdminList();
+            }
+          } catch(e) {}
+        }
+        // Un code vient d'etre utilise
         else if (topic === topicCodeUsed) markCodeUsed(msg);
-        // Un autre admin a cree un code → l'ajouter a notre historique
+        // Un autre admin a cree un code
         else if (topic === topicAddCode) {
-          // Verifier si c'est pas un code qu'on a cree nous-meme
           const exists = codeHistory.find(c => c.code === msg);
           if (!exists) {
             const now = new Date();
@@ -503,22 +647,15 @@
 
     // ===== GENERATION DE CODES JETABLES =====
     function generateCode() {
-      const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 chiffres
+      const code = String(Math.floor(100000 + Math.random() * 900000));
       const now = new Date();
       const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-
-      // Ajouter en haut de l'historique
-      codeHistory.unshift({ code: code, status: 'waiting', time: time, from: 'moi' });
+      codeHistory.unshift({ code: code, status: 'waiting', time: time, from: currentUserName });
       saveHistory();
-
-      // Envoyer le code a l'Arduino
       if (client) client.publish(topicAddCode, code);
-
-      // Afficher le dernier code genere
       const el = document.getElementById('generatedCode');
       document.getElementById('codeText').textContent = code;
       el.classList.remove('hidden');
-
       updateCodeList();
     }
 
@@ -532,7 +669,6 @@
       });
     }
 
-    // Marquer un code comme utilise (appele en temps reel via MQTT)
     function markCodeUsed(code) {
       const entry = codeHistory.find(c => c.code === code && c.status === 'waiting');
       if (entry) {
@@ -540,7 +676,6 @@
         const now = new Date();
         entry.usedAt = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
       } else {
-        // Code cree par un autre admin qu'on avait pas vu
         const now = new Date();
         codeHistory.unshift({ code: code, status: 'used', time: '??:??', usedAt: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'inconnu' });
       }
@@ -552,7 +687,7 @@
     function clearHistory() {
       if (confirm('Vider tout l\'historique des codes ?')) {
         codeHistory = [];
-        saveHistory(); // publie aussi sur MQTT retained → vide sur tous les appareils
+        saveHistory();
         updateCodeList();
         document.getElementById('generatedCode').classList.add('hidden');
       }
@@ -561,7 +696,6 @@
     function deleteCodeFromHistory(code) {
       const entry = codeHistory.find(c => c.code === code);
       if (!entry) return;
-      // Si le code est encore en attente, dire a l'Arduino de le supprimer aussi
       if (entry.status === 'waiting' && client) {
         client.publish(topicDelCode, code);
       }
@@ -572,7 +706,6 @@
     }
 
     function showNotif(text) {
-      // Supprimer ancienne notif
       const old = document.querySelector('.notif');
       if (old) old.remove();
       const n = document.createElement('div');
@@ -585,19 +718,78 @@
     function updateCodeList() {
       const el = document.getElementById('codeList');
       if (codeHistory.length === 0) { el.innerHTML = ''; return; }
-
       let html = '<div style="opacity:0.5;margin-bottom:8px;">Historique des codes :</div>';
       codeHistory.forEach(c => {
         const isUsed = c.status === 'used';
         const badge = isUsed
           ? '<span class="badge used">✅ Utilise a ' + c.usedAt + '</span>'
           : '<span class="badge waiting">⏳ En attente</span>';
-        const from = c.from === 'moi' ? '' : ' <span style="opacity:0.4;font-size:0.8em;">(' + c.from + ')</span>';
+        const from = c.from ? ' <span style="opacity:0.4;font-size:0.8em;">(' + c.from + ')</span>' : '';
         html += '<div class="code-item' + (isUsed ? ' used' : '') + '">'
           + '<span>' + c.code + '</span>'
           + '<div>' + badge + from
           + '<button class="btn-delete" onclick="deleteCodeFromHistory(\'' + c.code + '\')" title="Supprimer">🗑</button>'
           + '</div>'
+          + '</div>';
+      });
+      el.innerHTML = html;
+    }
+
+    // ===== GESTION ADMINS (super admin only) =====
+    function showCreateAdminModal() {
+      document.getElementById('createAdminModal').classList.remove('hidden');
+      document.getElementById('newAdminName').value = '';
+      document.getElementById('newAdminPin').value = '';
+      document.getElementById('modalError').textContent = '';
+      document.getElementById('newAdminName').focus();
+    }
+    function hideCreateAdminModal() {
+      document.getElementById('createAdminModal').classList.add('hidden');
+    }
+
+    function createAdmin() {
+      const name = document.getElementById('newAdminName').value.trim();
+      const pin = document.getElementById('newAdminPin').value.trim();
+      const errEl = document.getElementById('modalError');
+
+      if (!name) { errEl.textContent = 'Entre un nom'; return; }
+      if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { errEl.textContent = 'Le PIN doit faire 4 chiffres'; return; }
+      if (pin === SUPER_ADMIN_PIN) { errEl.textContent = 'Ce PIN est reserve au Super Admin'; return; }
+      if (adminAccounts.find(a => a.pin === pin)) { errEl.textContent = 'Ce PIN est deja utilise'; return; }
+
+      adminAccounts.push({ pin: pin, name: name });
+      saveAdmins();
+      updateAdminList();
+      hideCreateAdminModal();
+      showNotif('✅ Admin "' + name + '" cree (PIN: ' + pin + ')');
+    }
+
+    function deleteAdmin(pin) {
+      const admin = adminAccounts.find(a => a.pin === pin);
+      if (!admin) return;
+      if (confirm('Supprimer l\'admin "' + admin.name + '" ?')) {
+        adminAccounts = adminAccounts.filter(a => a.pin !== pin);
+        saveAdmins();
+        updateAdminList();
+        showNotif('🗑 Admin "' + admin.name + '" supprime');
+      }
+    }
+
+    function updateAdminList() {
+      const el = document.getElementById('adminList');
+      if (!el) return;
+      if (adminAccounts.length === 0) {
+        el.innerHTML = '<div style="opacity:0.4;padding:10px;font-size:0.85em;">Aucun admin cree</div>';
+        return;
+      }
+      let html = '<div style="opacity:0.5;margin-bottom:8px;margin-top:10px;">Admins actifs :</div>';
+      adminAccounts.forEach(a => {
+        html += '<div class="admin-item">'
+          + '<div class="admin-info">'
+          + '<div class="admin-name">🔑 ' + a.name + '</div>'
+          + '<div class="admin-pin">PIN: ' + a.pin + '</div>'
+          + '</div>'
+          + '<button class="btn-delete" onclick="deleteAdmin(\'' + a.pin + '\')" title="Supprimer">🗑</button>'
           + '</div>';
       });
       el.innerHTML = html;
@@ -627,6 +819,8 @@
         connexEl.className = 'connexion ok';
         connexEl.innerHTML = '<span class="dot green"></span> Connecte';
         guestClient.subscribe(topicCodeResult);
+        // Also subscribe to admins topic so we have the list ready for PIN check
+        guestClient.subscribe(topicAdmins);
       });
       guestClient.on('message', function(topic, message) {
         if (topic === topicCodeResult) {
@@ -637,6 +831,16 @@
           } else {
             resultEl.innerHTML = '<div class="result-msg fail">❌ Code invalide ou deja utilise</div>';
           }
+        }
+        // Sync admin accounts even before login (for PIN check)
+        else if (topic === topicAdmins) {
+          try {
+            const remoteAdmins = JSON.parse(message.toString());
+            if (Array.isArray(remoteAdmins)) {
+              adminAccounts = remoteAdmins;
+              try { localStorage.setItem('porte_admins', JSON.stringify(adminAccounts)); } catch(e) {}
+            }
+          } catch(e) {}
         }
       });
       guestClient.on('error', function() {
@@ -650,6 +854,33 @@
       document.getElementById('guestResult').innerHTML = '<div class="result-msg checking">⏳ Verification...</div>';
       if (guestClient) guestClient.publish(topicUseCode, guestInput);
     }
+
+    // ===== PRE-LOAD ADMIN LIST =====
+    // Connect briefly to get admin list for PIN verification (before login)
+    (function preloadAdmins() {
+      const preClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+        clientId: 'preload-' + Math.random().toString(36).substr(2, 8),
+        clean: true
+      });
+      preClient.on('connect', function() {
+        preClient.subscribe(topicAdmins);
+      });
+      preClient.on('message', function(topic, message) {
+        if (topic === topicAdmins) {
+          try {
+            const remoteAdmins = JSON.parse(message.toString());
+            if (Array.isArray(remoteAdmins)) {
+              adminAccounts = remoteAdmins;
+              try { localStorage.setItem('porte_admins', JSON.stringify(adminAccounts)); } catch(e) {}
+            }
+          } catch(e) {}
+          // Got the list, disconnect preload client
+          preClient.end();
+        }
+      });
+      // Timeout: if no retained message in 5s, disconnect
+      setTimeout(() => { try { preClient.end(); } catch(e) {} }, 5000);
+    })();
   </script>
 </body>
 </html>
