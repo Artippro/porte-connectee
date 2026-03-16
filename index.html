@@ -1,216 +1,497 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Porte Connectee</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center}
-.screen{text-align:center;padding:40px 30px;background:rgba(255,255,255,.06);border-radius:24px;box-shadow:0 8px 40px rgba(0,0,0,.4);max-width:420px;width:90%}
-.icon{font-size:4em;margin-bottom:15px}.hidden{display:none!important}
-h1{font-size:1.5em;margin-bottom:5px}.subtitle{opacity:.5;font-size:.85em;margin-bottom:25px}
-.choice-btn{display:block;width:100%;padding:20px;font-size:1.1em;font-weight:700;border:none;border-radius:14px;cursor:pointer;color:#fff;margin:10px 0;transition:all .2s}
-.choice-btn:active{transform:scale(.97)}
-.choice-admin{background:linear-gradient(135deg,#667eea,#764ba2)}
-.choice-code{background:linear-gradient(135deg,#f093fb,#f5576c)}
-.pin-dots{display:flex;justify-content:center;gap:12px;margin:25px 0}
-.pin-dot{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.3);transition:all .2s}
-.pin-dot.filled{background:#00ff64;border-color:#00ff64;box-shadow:0 0 10px rgba(0,255,100,.4)}
-.pin-dot.error{background:#ff5050;border-color:#ff5050}
-.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:260px;margin:0 auto}
-.key{padding:16px;font-size:1.4em;font-weight:700;border:none;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;transition:all .15s}
-.key:hover{background:rgba(255,255,255,.2)}.key:active{transform:scale(.93)}
-.key-del{background:rgba(255,50,50,.2);font-size:1em}
-.error-msg{color:#ff5050;margin-top:15px;font-size:.9em;min-height:1.2em}
-.back-link{display:inline-block;margin-top:20px;color:rgba(255,255,255,.4);cursor:pointer;font-size:.85em}
-.back-link:hover{color:#fff}
-.status{font-size:1.05em;margin:15px 0;padding:12px 20px;border-radius:12px;transition:all .3s}
-.status.on{background:rgba(0,255,100,.15);color:#00ff64}
-.status.off{background:rgba(255,50,50,.15);color:#ff5050}
-.status.waiting{background:rgba(255,200,0,.15);color:#ffc800}
-.btn{display:block;width:100%;padding:16px;font-size:1.15em;font-weight:700;border:none;border-radius:14px;cursor:pointer;transition:all .2s;color:#fff;margin:8px 0}
-.btn:active{transform:scale(.97)}
-.btn-on{background:linear-gradient(135deg,#00b09b,#96c93d)}
-.btn-off{background:linear-gradient(135deg,#e53935,#e35d5b)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.connexion{margin-top:15px;padding:10px;border-radius:10px;font-size:.8em}
-.connexion.ok{background:rgba(0,255,100,.1);color:#00ff64}
-.connexion.ko{background:rgba(255,50,50,.1);color:#ff5050}
-.connexion.loading{background:rgba(255,200,0,.1);color:#ffc800}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
-.dot.green{background:#00ff64}.dot.red{background:#ff5050}
-.dot.yellow{background:#ffc800;animation:pulse 1s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.section-title{font-size:.95em;font-weight:700;margin:25px 0 10px;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);color:#f093fb}
-.btn-generate{background:linear-gradient(135deg,#f093fb,#f5576c);padding:14px;font-size:1em}
-.generated-code{margin:15px 0;padding:18px;background:rgba(255,255,255,.08);border-radius:14px;font-size:2em;font-weight:900;letter-spacing:8px;color:#f093fb;cursor:pointer}
-.generated-code .copy-hint{display:block;font-size:.35em;letter-spacing:1px;opacity:.5;margin-top:5px}
-.code-list{text-align:left;margin-top:10px;font-size:.8em}
-.code-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin:4px 0;background:rgba(255,255,255,.05);border-radius:8px}
-.code-item span{font-family:monospace;letter-spacing:3px;font-weight:700}
-.code-item .badge{color:#ffc800;font-size:.85em}
-.code-input-display{font-size:2.5em;font-weight:900;letter-spacing:10px;margin:20px 0;min-height:1.3em;color:#f093fb}
-.result-msg{margin:15px 0;padding:15px;border-radius:12px;font-size:1.1em;font-weight:700}
-.result-msg.success{background:rgba(0,255,100,.15);color:#00ff64}
-.result-msg.fail{background:rgba(255,50,50,.15);color:#ff5050}
-.result-msg.checking{background:rgba(255,200,0,.15);color:#ffc800}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Porte Connectee</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .screen {
+      text-align: center;
+      padding: 40px 30px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 24px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+      max-width: 420px;
+      width: 90%;
+    }
+    .icon { font-size: 4em; margin-bottom: 15px; transition: all 0.3s; }
+    h1 { font-size: 1.5em; margin-bottom: 5px; }
+    .subtitle { opacity: 0.5; font-size: 0.85em; margin-bottom: 25px; }
+    .hidden { display: none !important; }
+
+    /* === ECRAN CHOIX === */
+    .choice-btn {
+      display: block;
+      width: 100%;
+      padding: 20px;
+      font-size: 1.1em;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      color: white;
+      margin: 10px 0;
+      transition: all 0.2s;
+    }
+    .choice-btn:active { transform: scale(0.97); }
+    .choice-admin { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .choice-admin:hover { box-shadow: 0 5px 25px rgba(102,126,234,0.4); }
+    .choice-code { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .choice-code:hover { box-shadow: 0 5px 25px rgba(245,87,108,0.4); }
+
+    /* === CLAVIER PIN === */
+    .pin-dots {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin: 25px 0;
+    }
+    .pin-dot {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.3);
+      transition: all 0.2s;
+    }
+    .pin-dot.filled { background: #00ff64; border-color: #00ff64; box-shadow: 0 0 10px rgba(0,255,100,0.4); }
+    .pin-dot.error { background: #ff5050; border-color: #ff5050; }
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      max-width: 260px;
+      margin: 0 auto;
+    }
+    .key {
+      padding: 16px;
+      font-size: 1.4em;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .key:hover { background: rgba(255,255,255,0.2); }
+    .key:active { transform: scale(0.93); }
+    .key-del { background: rgba(255,50,50,0.2); font-size: 1em; }
+    .error-msg { color: #ff5050; margin-top: 15px; font-size: 0.9em; min-height: 1.2em; }
+    .back-link { display: inline-block; margin-top: 20px; color: rgba(255,255,255,0.4); cursor: pointer; font-size: 0.85em; }
+    .back-link:hover { color: white; }
+
+    /* === CONTROLE ADMIN === */
+    .status {
+      font-size: 1.05em;
+      margin: 15px 0;
+      padding: 12px 20px;
+      border-radius: 12px;
+      transition: all 0.3s;
+    }
+    .status.on { background: rgba(0,255,100,0.15); color: #00ff64; }
+    .status.off { background: rgba(255,50,50,0.15); color: #ff5050; }
+    .status.waiting { background: rgba(255,200,0,0.15); color: #ffc800; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      font-size: 1.15em;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: white;
+      margin: 8px 0;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-on { background: linear-gradient(135deg, #00b09b, #96c93d); }
+    .btn-on:hover { box-shadow: 0 5px 25px rgba(0,176,155,0.4); }
+    .btn-off { background: linear-gradient(135deg, #e53935, #e35d5b); }
+    .btn-off:hover { box-shadow: 0 5px 25px rgba(229,57,53,0.4); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .connexion {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 0.8em;
+    }
+    .connexion.ok { background: rgba(0,255,100,0.1); color: #00ff64; }
+    .connexion.ko { background: rgba(255,50,50,0.1); color: #ff5050; }
+    .connexion.loading { background: rgba(255,200,0,0.1); color: #ffc800; }
+    .dot {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; margin-right: 6px; vertical-align: middle;
+    }
+    .dot.green { background: #00ff64; }
+    .dot.red { background: #ff5050; }
+    .dot.yellow { background: #ffc800; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* === SECTION CODES JETABLES === */
+    .section-title {
+      font-size: 0.95em;
+      font-weight: 700;
+      margin: 25px 0 10px 0;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      color: #f093fb;
+    }
+    .btn-generate {
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+      padding: 14px;
+      font-size: 1em;
+    }
+    .btn-generate:hover { box-shadow: 0 5px 25px rgba(245,87,108,0.4); }
+    .generated-code {
+      margin: 15px 0;
+      padding: 18px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 14px;
+      font-size: 2em;
+      font-weight: 900;
+      letter-spacing: 8px;
+      color: #f093fb;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .generated-code:hover { background: rgba(255,255,255,0.12); }
+    .generated-code .copy-hint {
+      display: block;
+      font-size: 0.35em;
+      letter-spacing: 1px;
+      opacity: 0.5;
+      margin-top: 5px;
+    }
+    .code-list {
+      text-align: left;
+      margin-top: 10px;
+      font-size: 0.8em;
+    }
+    .code-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+    }
+    .code-item span { font-family: monospace; letter-spacing: 3px; font-weight: 700; }
+    .code-item .badge { color: #ffc800; font-size: 0.85em; }
+
+    /* === ECRAN CODE INVITE === */
+    .code-input-display {
+      font-size: 2.5em;
+      font-weight: 900;
+      letter-spacing: 10px;
+      margin: 20px 0;
+      min-height: 1.3em;
+      color: #f093fb;
+    }
+    .result-msg {
+      margin: 15px 0;
+      padding: 15px;
+      border-radius: 12px;
+      font-size: 1.1em;
+      font-weight: 700;
+    }
+    .result-msg.success { background: rgba(0,255,100,0.15); color: #00ff64; }
+    .result-msg.fail { background: rgba(255,50,50,0.15); color: #ff5050; }
+    .result-msg.checking { background: rgba(255,200,0,0.15); color: #ffc800; }
+  </style>
 </head>
 <body>
 
-<!-- ECRAN CHOIX -->
-<div class="screen" id="choiceScreen">
-<div class="icon">&#x1F6AA;</div><h1>Porte Connectee</h1>
-<div class="subtitle">Controle a distance mondial</div>
-<button class="choice-btn choice-admin" onclick="showScreen('pinScreen')">&#x1F511; Admin (code PIN)</button>
-<button class="choice-btn choice-code" onclick="showScreen('guestScreen')">&#x1F3AB; Code jetable</button>
-</div>
+  <!-- ========== ECRAN 1 : CHOIX ========== -->
+  <div class="screen" id="choiceScreen">
+    <div class="icon">🚪</div>
+    <h1>Porte Connectee</h1>
+    <div class="subtitle">Controle a distance mondial</div>
+    <button class="choice-btn choice-admin" onclick="showScreen('pinScreen')">🔑 Admin (code PIN)</button>
+    <button class="choice-btn choice-code" onclick="showScreen('guestScreen')">🎫 J'ai un code jetable</button>
+  </div>
 
-<!-- ECRAN PIN ADMIN -->
-<div class="screen hidden" id="pinScreen">
-<div class="icon">&#x1F512;</div><h1>Acces Admin</h1><div class="subtitle">Entrez le code PIN</div>
-<div class="pin-dots" id="pinDots"><div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div><div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div></div>
-<div class="keypad">
-<button class="key" onclick="addDigit('1')">1</button><button class="key" onclick="addDigit('2')">2</button><button class="key" onclick="addDigit('3')">3</button>
-<button class="key" onclick="addDigit('4')">4</button><button class="key" onclick="addDigit('5')">5</button><button class="key" onclick="addDigit('6')">6</button>
-<button class="key" onclick="addDigit('7')">7</button><button class="key" onclick="addDigit('8')">8</button><button class="key" onclick="addDigit('9')">9</button>
-<button class="key key-del" onclick="clearPin()">&#x232B;</button><button class="key" onclick="addDigit('0')">0</button><button class="key key-del" onclick="removeDigit()">&#x2190;</button>
-</div>
-<div class="error-msg" id="errorMsg"></div>
-<div class="back-link" onclick="showScreen('choiceScreen')">&#x2190; Retour</div>
-</div>
+  <!-- ========== ECRAN 2a : PIN ADMIN ========== -->
+  <div class="screen hidden" id="pinScreen">
+    <div class="icon">🔒</div>
+    <h1>Acces Admin</h1>
+    <div class="subtitle">Entrez le code PIN</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="keypad">
+      <button class="key" onclick="addDigit('1')">1</button>
+      <button class="key" onclick="addDigit('2')">2</button>
+      <button class="key" onclick="addDigit('3')">3</button>
+      <button class="key" onclick="addDigit('4')">4</button>
+      <button class="key" onclick="addDigit('5')">5</button>
+      <button class="key" onclick="addDigit('6')">6</button>
+      <button class="key" onclick="addDigit('7')">7</button>
+      <button class="key" onclick="addDigit('8')">8</button>
+      <button class="key" onclick="addDigit('9')">9</button>
+      <button class="key key-del" onclick="clearPin()">⌫</button>
+      <button class="key" onclick="addDigit('0')">0</button>
+      <button class="key key-del" onclick="removeDigit()">←</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="back-link" onclick="showScreen('choiceScreen')">← Retour</div>
+  </div>
 
-<!-- ECRAN CODE INVITE -->
-<div class="screen hidden" id="guestScreen">
-<div class="icon">&#x1F3AB;</div><h1>Code Jetable</h1><div class="subtitle">Entrez le code a 6 chiffres recu</div>
-<div class="code-input-display" id="codeDisplay">_</div>
-<div class="keypad">
-<button class="key" onclick="addGuestDigit('1')">1</button><button class="key" onclick="addGuestDigit('2')">2</button><button class="key" onclick="addGuestDigit('3')">3</button>
-<button class="key" onclick="addGuestDigit('4')">4</button><button class="key" onclick="addGuestDigit('5')">5</button><button class="key" onclick="addGuestDigit('6')">6</button>
-<button class="key" onclick="addGuestDigit('7')">7</button><button class="key" onclick="addGuestDigit('8')">8</button><button class="key" onclick="addGuestDigit('9')">9</button>
-<button class="key key-del" onclick="clearGuest()">&#x232B;</button><button class="key" onclick="addGuestDigit('0')">0</button><button class="key" onclick="submitGuestCode()" style="background:rgba(0,255,100,.2)">&#x2713;</button>
-</div>
-<div id="guestResult"></div>
-<div class="connexion loading" id="guestConnexion"><span class="dot yellow"></span> Connexion...</div>
-<div class="back-link" onclick="showScreen('choiceScreen')">&#x2190; Retour</div>
-</div>
+  <!-- ========== ECRAN 2b : CODE INVITE ========== -->
+  <div class="screen hidden" id="guestScreen">
+    <div class="icon">🎫</div>
+    <h1>Code Jetable</h1>
+    <div class="subtitle">Entrez le code recu</div>
+    <div class="code-input-display" id="codeDisplay">_</div>
+    <div class="keypad">
+      <button class="key" onclick="addGuestDigit('1')">1</button>
+      <button class="key" onclick="addGuestDigit('2')">2</button>
+      <button class="key" onclick="addGuestDigit('3')">3</button>
+      <button class="key" onclick="addGuestDigit('4')">4</button>
+      <button class="key" onclick="addGuestDigit('5')">5</button>
+      <button class="key" onclick="addGuestDigit('6')">6</button>
+      <button class="key" onclick="addGuestDigit('7')">7</button>
+      <button class="key" onclick="addGuestDigit('8')">8</button>
+      <button class="key" onclick="addGuestDigit('9')">9</button>
+      <button class="key key-del" onclick="clearGuest()">⌫</button>
+      <button class="key" onclick="addGuestDigit('0')">0</button>
+      <button class="key" onclick="submitGuestCode()" style="background:rgba(0,255,100,0.2);">✓</button>
+    </div>
+    <div id="guestResult"></div>
+    <div class="connexion loading" id="guestConnexion">
+      <span class="dot yellow"></span> Connexion...
+    </div>
+    <div class="back-link" onclick="showScreen('choiceScreen')">← Retour</div>
+  </div>
 
-<!-- ECRAN CONTROLE ADMIN -->
-<div class="screen hidden" id="controlScreen">
-<div class="icon" id="adminIcon">&#x1F512;</div><h1>Panneau Admin</h1><div class="subtitle">Controle total</div>
-<div class="status waiting" id="status">Connexion en cours...</div>
-<button class="btn btn-on" id="btnOn" onclick="send('ON')" disabled>&#x1F513; OUVRIR</button>
-<button class="btn btn-off" id="btnOff" onclick="send('OFF')" disabled>&#x1F512; FERMER</button>
-<div class="connexion loading" id="adminConnexion"><span class="dot yellow"></span> Connexion au serveur...</div>
-<div class="section-title">&#x1F3AB; Codes Jetables</div>
-<button class="btn btn-generate" onclick="generateCode()">Generer un code jetable</button>
-<div class="generated-code hidden" id="generatedCode" onclick="copyCode()"><span id="codeText"></span><span class="copy-hint">Appuyer pour copier</span></div>
-<div class="code-list" id="codeList"></div>
-<div class="back-link" onclick="location.reload()">&#x1F6AA; Deconnexion</div>
-</div>
+  <!-- ========== ECRAN 3 : CONTROLE ADMIN ========== -->
+  <div class="screen hidden" id="controlScreen">
+    <div class="icon" id="adminIcon">🔒</div>
+    <h1>Panneau Admin</h1>
+    <div class="subtitle">Controle total</div>
 
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-<script>
-var CODE_PIN="1234";
-var topicCmd="porte-vincent-2026/commande",topicState="porte-vincent-2026/etat";
-var topicAddCode="porte-vincent-2026/addcode",topicUseCode="porte-vincent-2026/usecode",topicCodeResult="porte-vincent-2026/coderesult";
-var client=null,guestClient=null;
+    <div class="status waiting" id="status">Connexion en cours...</div>
 
-function showScreen(id){
-  document.querySelectorAll(".screen").forEach(function(s){s.classList.add("hidden")});
-  document.getElementById(id).classList.remove("hidden");
-  if(id==="guestScreen"&&!guestClient)connectGuestMQTT();
-}
+    <button class="btn btn-on" id="btnOn" onclick="send('ON')" disabled>🔓 OUVRIR</button>
+    <button class="btn btn-off" id="btnOff" onclick="send('OFF')" disabled>🔒 FERMER</button>
 
-var pinInput="",attempts=0,maxAttempts=5;
-function addDigit(d){if(pinInput.length>=4)return;pinInput+=d;updateDots();if(pinInput.length===4)setTimeout(checkPin,200)}
-function removeDigit(){pinInput=pinInput.slice(0,-1);updateDots();document.getElementById("errorMsg").textContent=""}
-function clearPin(){pinInput="";updateDots();document.getElementById("errorMsg").textContent=""}
-function updateDots(){for(var i=0;i<4;i++)document.getElementById("d"+i).className="pin-dot"+(i<pinInput.length?" filled":"")}
-function checkPin(){
-  if(pinInput===CODE_PIN){showScreen("controlScreen");connectAdminMQTT()}
-  else{
-    attempts++;
-    for(var i=0;i<4;i++)document.getElementById("d"+i).className="pin-dot error";
-    if(attempts>=maxAttempts){
-      document.getElementById("errorMsg").textContent="Trop de tentatives. Rechargez la page.";
-      document.querySelectorAll(".key").forEach(function(k){k.disabled=true});
-    }else{
-      document.getElementById("errorMsg").textContent="Code incorrect ("+(maxAttempts-attempts)+" essais restants)";
-      setTimeout(function(){pinInput="";updateDots()},600);
+    <div class="connexion loading" id="adminConnexion">
+      <span class="dot yellow"></span> Connexion au serveur...
+    </div>
+
+    <!-- SECTION CODES JETABLES -->
+    <div class="section-title">🎫 Codes Jetables</div>
+    <button class="btn btn-generate" onclick="generateCode()">Generer un code jetable</button>
+    <div class="generated-code hidden" id="generatedCode" onclick="copyCode()">
+      <span id="codeText"></span>
+      <span class="copy-hint">Appuyer pour copier</span>
+    </div>
+    <div class="code-list" id="codeList"></div>
+
+    <div class="back-link" onclick="location.reload()">🚪 Deconnexion</div>
+  </div>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    // ===== CODE PIN ADMIN (4 chiffres) =====
+    const CODE_PIN = '1234';
+    // ========================================
+
+    // MQTT topics
+    const topicCmd        = 'porte-vincent-2026/commande';
+    const topicState      = 'porte-vincent-2026/etat';
+    const topicAddCode    = 'porte-vincent-2026/addcode';
+    const topicUseCode    = 'porte-vincent-2026/usecode';
+    const topicCodeResult = 'porte-vincent-2026/coderesult';
+
+    let client = null;
+    let guestClient = null;
+
+    // ===== NAVIGATION =====
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      if (id === 'guestScreen' && !guestClient) connectGuestMQTT();
     }
-  }
-}
 
-var generatedCodes=[];
-function connectAdminMQTT(){
-  client=mqtt.connect("wss://broker.hivemq.com:8884/mqtt",{clientId:"admin-"+Math.random().toString(36).substr(2,8),clean:true});
-  var cx=document.getElementById("adminConnexion"),bo=document.getElementById("btnOn"),bf=document.getElementById("btnOff");
-  client.on("connect",function(){
-    cx.className="connexion ok";cx.innerHTML="<span class='dot green'></span> Connecte au cloud";
-    bo.disabled=false;bf.disabled=false;client.subscribe(topicState);
-  });
-  client.on("message",function(t,m){if(t===topicState)updateAdminUI(m.toString())});
-  client.on("error",function(){cx.className="connexion ko";cx.innerHTML="<span class='dot red'></span> Erreur"});
-}
-function updateAdminUI(s){
-  var ic=document.getElementById("adminIcon"),st=document.getElementById("status");
-  if(s==="ON"){ic.innerHTML="&#x1F513;";st.className="status on";st.textContent="Etat : OUVERT (LED allumee)"}
-  else{ic.innerHTML="&#x1F512;";st.className="status off";st.textContent="Etat : FERME (LED eteinte)"}
-}
-function send(c){if(client)client.publish(topicCmd,c)}
+    // ===== PIN ADMIN =====
+    let pinInput = '';
+    let attempts = 0;
+    const maxAttempts = 5;
 
-function generateCode(){
-  var code=String(Math.floor(100000+Math.random()*900000));
-  generatedCodes.push(code);
-  if(client)client.publish(topicAddCode,code);
-  document.getElementById("codeText").textContent=code;
-  document.getElementById("generatedCode").classList.remove("hidden");
-  updateCodeList();
-}
-function copyCode(){
-  var c=document.getElementById("codeText").textContent;
-  navigator.clipboard.writeText(c).then(function(){
-    var h=document.getElementById("generatedCode").querySelector(".copy-hint");
-    h.textContent="Copie !";setTimeout(function(){h.textContent="Appuyer pour copier"},1500);
-  });
-}
-function updateCodeList(){
-  var el=document.getElementById("codeList");
-  if(generatedCodes.length===0){el.innerHTML="";return}
-  var h="<div style='opacity:.5;margin-bottom:5px'>Codes actifs :</div>";
-  generatedCodes.forEach(function(c){h+="<div class='code-item'><span>"+c+"</span><span class='badge'>En attente</span></div>"});
-  el.innerHTML=h;
-}
-
-var guestInput="";
-function addGuestDigit(d){
-  if(guestInput.length>=6)return;guestInput+=d;
-  document.getElementById("codeDisplay").textContent=guestInput+(guestInput.length<6?"_":"");
-}
-function clearGuest(){guestInput="";document.getElementById("codeDisplay").textContent="_";document.getElementById("guestResult").innerHTML=""}
-function connectGuestMQTT(){
-  guestClient=mqtt.connect("wss://broker.hivemq.com:8884/mqtt",{clientId:"guest-"+Math.random().toString(36).substr(2,8),clean:true});
-  var cx=document.getElementById("guestConnexion");
-  guestClient.on("connect",function(){
-    cx.className="connexion ok";cx.innerHTML="<span class='dot green'></span> Connecte";
-    guestClient.subscribe(topicCodeResult);
-  });
-  guestClient.on("message",function(t,m){
-    if(t===topicCodeResult){
-      var r=document.getElementById("guestResult");
-      if(m.toString()==="OK"){r.innerHTML="<div class='result-msg success'>Code valide ! Porte ouverte 5s</div>";setTimeout(clearGuest,5000)}
-      else{r.innerHTML="<div class='result-msg fail'>Code invalide ou deja utilise</div>"}
+    function addDigit(d) {
+      if (pinInput.length >= 4) return;
+      pinInput += d;
+      updateDots();
+      if (pinInput.length === 4) setTimeout(checkPin, 200);
     }
-  });
-  guestClient.on("error",function(){cx.className="connexion ko";cx.innerHTML="<span class='dot red'></span> Erreur"});
-}
-function submitGuestCode(){
-  if(guestInput.length!==6)return;
-  document.getElementById("guestResult").innerHTML="<div class='result-msg checking'>Verification...</div>";
-  if(guestClient)guestClient.publish(topicUseCode,guestInput);
-}
-</script>
+    function removeDigit() { pinInput = pinInput.slice(0, -1); updateDots(); document.getElementById('errorMsg').textContent = ''; }
+    function clearPin() { pinInput = ''; updateDots(); document.getElementById('errorMsg').textContent = ''; }
+    function updateDots() {
+      for (let i = 0; i < 4; i++) {
+        document.getElementById('d' + i).className = 'pin-dot' + (i < pinInput.length ? ' filled' : '');
+      }
+    }
+    function checkPin() {
+      if (pinInput === CODE_PIN) {
+        showScreen('controlScreen');
+        connectAdminMQTT();
+      } else {
+        attempts++;
+        for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'pin-dot error';
+        if (attempts >= maxAttempts) {
+          document.getElementById('errorMsg').textContent = 'Trop de tentatives. Rechargez la page.';
+          document.querySelectorAll('.key').forEach(k => k.disabled = true);
+        } else {
+          document.getElementById('errorMsg').textContent = 'Code incorrect (' + (maxAttempts - attempts) + ' essais restants)';
+          setTimeout(() => { pinInput = ''; updateDots(); }, 600);
+        }
+      }
+    }
+
+    // ===== MQTT ADMIN =====
+    let generatedCodes = [];
+
+    function connectAdminMQTT() {
+      client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+        clientId: 'admin-porte-' + Math.random().toString(36).substr(2, 8),
+        clean: true
+      });
+      const connexEl = document.getElementById('adminConnexion');
+      const btnOn = document.getElementById('btnOn');
+      const btnOff = document.getElementById('btnOff');
+
+      client.on('connect', function() {
+        connexEl.className = 'connexion ok';
+        connexEl.innerHTML = '<span class="dot green"></span> Connecte au cloud';
+        btnOn.disabled = false;
+        btnOff.disabled = false;
+        client.subscribe(topicState);
+      });
+      client.on('message', function(topic, message) {
+        if (topic === topicState) updateAdminUI(message.toString());
+      });
+      client.on('error', function() {
+        connexEl.className = 'connexion ko';
+        connexEl.innerHTML = '<span class="dot red"></span> Erreur de connexion';
+      });
+    }
+
+    function updateAdminUI(state) {
+      const iconEl = document.getElementById('adminIcon');
+      const statusEl = document.getElementById('status');
+      if (state === 'ON') {
+        iconEl.textContent = '🔓';
+        statusEl.className = 'status on';
+        statusEl.textContent = 'Etat : OUVERT (LED allumee)';
+      } else {
+        iconEl.textContent = '🔒';
+        statusEl.className = 'status off';
+        statusEl.textContent = 'Etat : FERME (LED eteinte)';
+      }
+    }
+
+    function send(command) {
+      if (client) client.publish(topicCmd, command);
+    }
+
+    // ===== GENERATION DE CODES JETABLES =====
+    function generateCode() {
+      const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 chiffres
+      generatedCodes.push(code);
+
+      // Envoyer le code à l'Arduino
+      if (client) client.publish(topicAddCode, code);
+
+      // Afficher
+      const el = document.getElementById('generatedCode');
+      document.getElementById('codeText').textContent = code;
+      el.classList.remove('hidden');
+
+      // Ajouter à la liste
+      updateCodeList();
+    }
+
+    function copyCode() {
+      const code = document.getElementById('codeText').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const el = document.getElementById('generatedCode');
+        const old = el.querySelector('.copy-hint').textContent;
+        el.querySelector('.copy-hint').textContent = '✓ Copie !';
+        setTimeout(() => el.querySelector('.copy-hint').textContent = old, 1500);
+      });
+    }
+
+    function updateCodeList() {
+      const el = document.getElementById('codeList');
+      if (generatedCodes.length === 0) { el.innerHTML = ''; return; }
+      el.innerHTML = '<div style="opacity:0.5;margin-bottom:5px;">Codes actifs :</div>' +
+        generatedCodes.map(c =>
+          '<div class="code-item"><span>' + c + '</span><span class="badge">En attente</span></div>'
+        ).join('');
+    }
+
+    // ===== MQTT INVITE (code jetable) =====
+    let guestInput = '';
+
+    function addGuestDigit(d) {
+      if (guestInput.length >= 6) return;
+      guestInput += d;
+      document.getElementById('codeDisplay').textContent = guestInput + (guestInput.length < 6 ? '_' : '');
+    }
+    function clearGuest() {
+      guestInput = '';
+      document.getElementById('codeDisplay').textContent = '_';
+      document.getElementById('guestResult').innerHTML = '';
+    }
+
+    function connectGuestMQTT() {
+      guestClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+        clientId: 'guest-porte-' + Math.random().toString(36).substr(2, 8),
+        clean: true
+      });
+      const connexEl = document.getElementById('guestConnexion');
+      guestClient.on('connect', function() {
+        connexEl.className = 'connexion ok';
+        connexEl.innerHTML = '<span class="dot green"></span> Connecte';
+        guestClient.subscribe(topicCodeResult);
+      });
+      guestClient.on('message', function(topic, message) {
+        if (topic === topicCodeResult) {
+          const resultEl = document.getElementById('guestResult');
+          if (message.toString() === 'OK') {
+            resultEl.innerHTML = '<div class="result-msg success">✅ Code valide ! Porte ouverte (5s)</div>';
+            setTimeout(clearGuest, 5000);
+          } else {
+            resultEl.innerHTML = '<div class="result-msg fail">❌ Code invalide ou deja utilise</div>';
+          }
+        }
+      });
+      guestClient.on('error', function() {
+        connexEl.className = 'connexion ko';
+        connexEl.innerHTML = '<span class="dot red"></span> Erreur';
+      });
+    }
+
+    function submitGuestCode() {
+      if (guestInput.length !== 6) return;
+      document.getElementById('guestResult').innerHTML = '<div class="result-msg checking">⏳ Verification...</div>';
+      if (guestClient) guestClient.publish(topicUseCode, guestInput);
+    }
+  </script>
 </body>
 </html>
