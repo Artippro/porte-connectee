@@ -188,7 +188,27 @@
       border-radius: 8px;
     }
     .code-item span { font-family: monospace; letter-spacing: 3px; font-weight: 700; }
-    .code-item .badge { color: #ffc800; font-size: 0.85em; }
+    .code-item .badge { font-size: 0.85em; }
+    .code-item .badge.waiting { color: #ffc800; }
+    .code-item .badge.used { color: #00ff64; }
+    .code-item.used { opacity: 0.5; }
+    .code-item.used span:first-child { text-decoration: line-through; }
+    .notif {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.95em;
+      z-index: 999;
+      animation: slideDown 0.3s ease-out;
+      background: rgba(0,255,100,0.2);
+      color: #00ff64;
+      border: 1px solid rgba(0,255,100,0.3);
+    }
+    @keyframes slideDown { from { transform: translateX(-50%) translateY(-30px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 
     /* === ECRAN CODE INVITE === */
     .code-input-display {
@@ -317,9 +337,13 @@
     const topicAddCode    = 'porte-vincent-2026/addcode';
     const topicUseCode    = 'porte-vincent-2026/usecode';
     const topicCodeResult = 'porte-vincent-2026/coderesult';
+    const topicCodeUsed   = 'porte-vincent-2026/codeused';
 
     let client = null;
     let guestClient = null;
+
+    // Historique des codes : { code: '123456', status: 'waiting'|'used', time: '14:32' }
+    let codeHistory = [];
 
     // ===== NAVIGATION =====
     function showScreen(id) {
@@ -364,7 +388,6 @@
     }
 
     // ===== MQTT ADMIN =====
-    let generatedCodes = [];
 
     function connectAdminMQTT() {
       client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
@@ -381,9 +404,25 @@
         btnOn.disabled = false;
         btnOff.disabled = false;
         client.subscribe(topicState);
+        client.subscribe(topicCodeUsed);
+        client.subscribe(topicAddCode);
       });
       client.on('message', function(topic, message) {
-        if (topic === topicState) updateAdminUI(message.toString());
+        const msg = message.toString();
+        if (topic === topicState) updateAdminUI(msg);
+        // Un code vient d'etre utilise → mettre a jour l'historique
+        else if (topic === topicCodeUsed) markCodeUsed(msg);
+        // Un autre admin a cree un code → l'ajouter a notre historique
+        else if (topic === topicAddCode) {
+          // Verifier si c'est pas un code qu'on a cree nous-meme
+          const exists = codeHistory.find(c => c.code === msg);
+          if (!exists) {
+            const now = new Date();
+            codeHistory.unshift({ code: msg, status: 'waiting', time: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'autre admin' });
+            updateCodeList();
+            showNotif('📥 Nouveau code cree par un autre admin : ' + msg);
+          }
+        }
       });
       client.on('error', function() {
         connexEl.className = 'connexion ko';
@@ -412,17 +451,20 @@
     // ===== GENERATION DE CODES JETABLES =====
     function generateCode() {
       const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 chiffres
-      generatedCodes.push(code);
+      const now = new Date();
+      const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
 
-      // Envoyer le code à l'Arduino
+      // Ajouter en haut de l'historique
+      codeHistory.unshift({ code: code, status: 'waiting', time: time, from: 'moi' });
+
+      // Envoyer le code a l'Arduino
       if (client) client.publish(topicAddCode, code);
 
-      // Afficher
+      // Afficher le dernier code genere
       const el = document.getElementById('generatedCode');
       document.getElementById('codeText').textContent = code;
       el.classList.remove('hidden');
 
-      // Ajouter à la liste
       updateCodeList();
     }
 
@@ -436,13 +478,50 @@
       });
     }
 
+    // Marquer un code comme utilise (appele en temps reel via MQTT)
+    function markCodeUsed(code) {
+      const entry = codeHistory.find(c => c.code === code && c.status === 'waiting');
+      if (entry) {
+        entry.status = 'used';
+        const now = new Date();
+        entry.usedAt = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+      } else {
+        // Code cree par un autre admin qu'on avait pas vu
+        const now = new Date();
+        codeHistory.unshift({ code: code, status: 'used', time: '??:??', usedAt: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'inconnu' });
+      }
+      updateCodeList();
+      showNotif('🔓 Code ' + code + ' utilise ! Porte ouverte');
+    }
+
+    function showNotif(text) {
+      // Supprimer ancienne notif
+      const old = document.querySelector('.notif');
+      if (old) old.remove();
+      const n = document.createElement('div');
+      n.className = 'notif';
+      n.textContent = text;
+      document.body.appendChild(n);
+      setTimeout(() => n.remove(), 4000);
+    }
+
     function updateCodeList() {
       const el = document.getElementById('codeList');
-      if (generatedCodes.length === 0) { el.innerHTML = ''; return; }
-      el.innerHTML = '<div style="opacity:0.5;margin-bottom:5px;">Codes actifs :</div>' +
-        generatedCodes.map(c =>
-          '<div class="code-item"><span>' + c + '</span><span class="badge">En attente</span></div>'
-        ).join('');
+      if (codeHistory.length === 0) { el.innerHTML = ''; return; }
+
+      let html = '<div style="opacity:0.5;margin-bottom:8px;">Historique des codes :</div>';
+      codeHistory.forEach(c => {
+        const isUsed = c.status === 'used';
+        const badge = isUsed
+          ? '<span class="badge used">✅ Utilise a ' + c.usedAt + '</span>'
+          : '<span class="badge waiting">⏳ En attente</span>';
+        const from = c.from === 'moi' ? '' : ' <span style="opacity:0.4;font-size:0.8em;">(' + c.from + ')</span>';
+        html += '<div class="code-item' + (isUsed ? ' used' : '') + '">'
+          + '<span>' + c.code + '</span>'
+          + '<div>' + badge + from + '</div>'
+          + '</div>';
+      });
+      el.innerHTML = html;
     }
 
     // ===== MQTT INVITE (code jetable) =====

@@ -26,6 +26,7 @@ const char topicState[]     = "porte-vincent-2026/etat";
 const char topicAddCode[]   = "porte-vincent-2026/addcode";    // admin ajoute un code
 const char topicUseCode[]   = "porte-vincent-2026/usecode";    // ami utilise un code
 const char topicCodeResult[] = "porte-vincent-2026/coderesult"; // résultat (ok/fail)
+const char topicCodeUsed[]   = "porte-vincent-2026/codeused";   // notifie quel code a été utilisé
 
 const int LED_PIN = 13;
 bool ledState = false;
@@ -179,6 +180,10 @@ void onMqttMessage(int messageSize) {
       // Code valide → ouvrir la porte temporairement
       mqttClient.beginMessage(topicCodeResult);
       mqttClient.print("OK");
+      mqttClient.endMessage();
+      // Notifier tous les admins quel code a été utilisé
+      mqttClient.beginMessage(topicCodeUsed);
+      mqttClient.print(message);
       mqttClient.endMessage();
       openDoorTemporary();
     } else {
