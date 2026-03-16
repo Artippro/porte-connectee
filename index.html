@@ -79,10 +79,103 @@
     .dot.red { background: #ff5050; }
     .dot.yellow { background: #ffc800; animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* --- Ecran de code --- */
+    .lock-screen {
+      text-align: center;
+      padding: 40px 30px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 24px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+      max-width: 400px;
+      width: 90%;
+    }
+    .lock-screen .icon { font-size: 4em; margin-bottom: 10px; }
+    .pin-dots {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin: 25px 0;
+    }
+    .pin-dot {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.3);
+      transition: all 0.2s;
+    }
+    .pin-dot.filled {
+      background: #00ff64;
+      border-color: #00ff64;
+      box-shadow: 0 0 10px rgba(0,255,100,0.4);
+    }
+    .pin-dot.error {
+      background: #ff5050;
+      border-color: #ff5050;
+      box-shadow: 0 0 10px rgba(255,50,50,0.4);
+    }
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      max-width: 260px;
+      margin: 0 auto;
+    }
+    .key {
+      padding: 16px;
+      font-size: 1.4em;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .key:hover { background: rgba(255,255,255,0.2); }
+    .key:active { transform: scale(0.93); background: rgba(255,255,255,0.25); }
+    .key-del { background: rgba(255,50,50,0.2); font-size: 1em; }
+    .key-del:hover { background: rgba(255,50,50,0.3); }
+    .error-msg {
+      color: #ff5050;
+      margin-top: 15px;
+      font-size: 0.9em;
+      min-height: 1.2em;
+    }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <div class="container">
+
+  <!-- ECRAN CODE PIN -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="icon">&#128274;</div>
+    <h1>Porte Connectee</h1>
+    <div class="subtitle">Entrez le code d'acces</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="keypad">
+      <button class="key" onclick="addDigit('1')">1</button>
+      <button class="key" onclick="addDigit('2')">2</button>
+      <button class="key" onclick="addDigit('3')">3</button>
+      <button class="key" onclick="addDigit('4')">4</button>
+      <button class="key" onclick="addDigit('5')">5</button>
+      <button class="key" onclick="addDigit('6')">6</button>
+      <button class="key" onclick="addDigit('7')">7</button>
+      <button class="key" onclick="addDigit('8')">8</button>
+      <button class="key" onclick="addDigit('9')">9</button>
+      <button class="key key-del" onclick="clearPin()">&#9003;</button>
+      <button class="key" onclick="addDigit('0')">0</button>
+      <button class="key key-del" onclick="removeDigit()">&#8592;</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <!-- ECRAN CONTROLE (caché au départ) -->
+  <div class="container hidden" id="controlScreen">
     <div class="icon" id="icon">&#128274;</div>
     <h1>Porte Connectee</h1>
     <div class="subtitle">Controle a distance mondial</div>
@@ -98,80 +191,129 @@
     </div>
   </div>
 
-  <!-- MQTT.js via CDN - fonctionne dans le navigateur -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script>
-    // Topics MQTT (doivent correspondre au code Arduino)
+    // ===== CODE PIN (4 chiffres) =====
+    const CODE_PIN = '1234';
+    // ==================================
+
+    let pinInput = '';
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    function addDigit(d) {
+      if (pinInput.length >= 4) return;
+      pinInput += d;
+      updateDots();
+      if (pinInput.length === 4) {
+        setTimeout(checkPin, 200);
+      }
+    }
+
+    function removeDigit() {
+      pinInput = pinInput.slice(0, -1);
+      updateDots();
+      document.getElementById('errorMsg').textContent = '';
+    }
+
+    function clearPin() {
+      pinInput = '';
+      updateDots();
+      document.getElementById('errorMsg').textContent = '';
+    }
+
+    function updateDots() {
+      for (let i = 0; i < 4; i++) {
+        const dot = document.getElementById('d' + i);
+        dot.className = 'pin-dot' + (i < pinInput.length ? ' filled' : '');
+      }
+    }
+
+    function checkPin() {
+      if (pinInput === CODE_PIN) {
+        // Bon code
+        document.getElementById('lockScreen').classList.add('hidden');
+        document.getElementById('controlScreen').classList.remove('hidden');
+        connectMQTT();
+      } else {
+        // Mauvais code
+        attempts++;
+        for (let i = 0; i < 4; i++) {
+          document.getElementById('d' + i).className = 'pin-dot error';
+        }
+        if (attempts >= maxAttempts) {
+          document.getElementById('errorMsg').textContent = 'Trop de tentatives. Rechargez la page.';
+          document.querySelectorAll('.key').forEach(k => k.disabled = true);
+        } else {
+          document.getElementById('errorMsg').textContent = 'Code incorrect (' + (maxAttempts - attempts) + ' essais restants)';
+          setTimeout(() => { pinInput = ''; updateDots(); }, 600);
+        }
+      }
+    }
+
+    // ===== MQTT (lancé seulement après le bon code) =====
     const topicCmd   = 'porte-vincent-2026/commande';
     const topicState = 'porte-vincent-2026/etat';
 
-    const iconEl     = document.getElementById('icon');
-    const statusEl   = document.getElementById('status');
-    const connexEl   = document.getElementById('connexion');
-    const dotEl      = document.getElementById('dot');
-    const btnOn      = document.getElementById('btnOn');
-    const btnOff     = document.getElementById('btnOff');
-
+    let client = null;
     let currentState = 'OFF';
 
-    // Connexion au broker MQTT via WebSocket
-    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
-      clientId: 'web-porte-' + Math.random().toString(36).substr(2, 8),
-      clean: true
-    });
+    function connectMQTT() {
+      const iconEl   = document.getElementById('icon');
+      const statusEl = document.getElementById('status');
+      const connexEl = document.getElementById('connexion');
+      const btnOn    = document.getElementById('btnOn');
+      const btnOff   = document.getElementById('btnOff');
 
-    client.on('connect', function () {
-      console.log('Connecte au broker MQTT !');
-      connexEl.className = 'connexion ok';
-      connexEl.innerHTML = '<span class="dot green"></span> Connecte au cloud';
-      btnOn.disabled = false;
-      btnOff.disabled = false;
+      client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+        clientId: 'web-porte-' + Math.random().toString(36).substr(2, 8),
+        clean: true
+      });
 
-      // Écouter l'état envoyé par l'Arduino
-      client.subscribe(topicState);
-    });
+      client.on('connect', function () {
+        connexEl.className = 'connexion ok';
+        connexEl.innerHTML = '<span class="dot green"></span> Connecte au cloud';
+        btnOn.disabled = false;
+        btnOff.disabled = false;
+        client.subscribe(topicState);
+      });
 
-    client.on('message', function (topic, message) {
-      const msg = message.toString();
-      console.log('Recu:', topic, msg);
+      client.on('message', function (topic, message) {
+        if (topic === topicState) {
+          currentState = message.toString();
+          updateControlUI();
+        }
+      });
 
-      if (topic === topicState) {
-        currentState = msg;
-        updateUI();
+      client.on('error', function () {
+        connexEl.className = 'connexion ko';
+        connexEl.innerHTML = '<span class="dot red"></span> Erreur de connexion';
+      });
+
+      client.on('offline', function () {
+        connexEl.className = 'connexion ko';
+        connexEl.innerHTML = '<span class="dot red"></span> Deconnecte';
+        btnOn.disabled = true;
+        btnOff.disabled = true;
+      });
+
+      function updateControlUI() {
+        if (currentState === 'ON') {
+          iconEl.innerHTML = '&#128275;';
+          statusEl.className = 'status on';
+          statusEl.textContent = 'Etat : OUVERT (LED allumee)';
+        } else {
+          iconEl.innerHTML = '&#128274;';
+          statusEl.className = 'status off';
+          statusEl.textContent = 'Etat : FERME (LED eteinte)';
+        }
       }
-    });
-
-    client.on('error', function (err) {
-      console.error('Erreur MQTT:', err);
-      connexEl.className = 'connexion ko';
-      connexEl.innerHTML = '<span class="dot red"></span> Erreur de connexion';
-    });
-
-    client.on('offline', function () {
-      connexEl.className = 'connexion ko';
-      connexEl.innerHTML = '<span class="dot red"></span> Deconnecte';
-      btnOn.disabled = true;
-      btnOff.disabled = true;
-    });
+      updateControlUI();
+    }
 
     function send(command) {
-      console.log('Envoi:', command);
-      client.publish(topicCmd, command);
+      if (client) client.publish(topicCmd, command);
     }
-
-    function updateUI() {
-      if (currentState === 'ON') {
-        iconEl.innerHTML = '&#128275;';
-        statusEl.className = 'status on';
-        statusEl.textContent = 'Etat : OUVERT (LED allumee)';
-      } else {
-        iconEl.innerHTML = '&#128274;';
-        statusEl.className = 'status off';
-        statusEl.textContent = 'Etat : FERME (LED eteinte)';
-      }
-    }
-
-    updateUI();
   </script>
 </body>
 </html>
