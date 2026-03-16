@@ -183,7 +183,6 @@ void onMqttMessage(int messageSize) {
       autoCloseTime = 0;
       digitalWrite(LED_PIN, HIGH);
       matrix.loadFrame(lockOpen);
-      matrix.play(true);
       Serial.println(">> LED ALLUMEE (admin) - Cadenas OUVERT");
     }
     else if (message == "OFF") {
@@ -191,7 +190,6 @@ void onMqttMessage(int messageSize) {
       autoCloseTime = 0;
       digitalWrite(LED_PIN, LOW);
       matrix.loadFrame(lockClosed);
-      matrix.play(true);
       Serial.println(">> LED ETEINTE (admin) - Cadenas FERME");
     }
     mqttClient.beginMessage(topicState);
@@ -261,7 +259,6 @@ void loop() {
     ledState = false;
     digitalWrite(LED_PIN, LOW);
     matrix.loadFrame(lockClosed);
-    matrix.play(true);
     Serial.println(">> FERMETURE AUTO (5s ecoulees) - Cadenas FERME");
     mqttClient.beginMessage(topicState);
     mqttClient.print("OFF");

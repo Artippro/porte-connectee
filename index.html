@@ -339,6 +339,7 @@
     const topicUseCode    = 'porte-vincent-2026/usecode';
     const topicCodeResult = 'porte-vincent-2026/coderesult';
     const topicCodeUsed   = 'porte-vincent-2026/codeused';
+    const topicHistory    = 'porte-vincent-2026/history';  // retained: historique partage
 
     let client = null;
     let guestClient = null;
@@ -353,6 +354,10 @@
 
     function saveHistory() {
       try { localStorage.setItem('porte_codeHistory', JSON.stringify(codeHistory)); } catch(e) {}
+      // Publier sur MQTT en retained → tous les appareils le recoivent
+      if (client && client.connected) {
+        client.publish(topicHistory, JSON.stringify(codeHistory), { retain: true });
+      }
     }
 
     // ===== NAVIGATION =====
@@ -417,10 +422,33 @@
         client.subscribe(topicState);
         client.subscribe(topicCodeUsed);
         client.subscribe(topicAddCode);
+        client.subscribe(topicHistory);
       });
       client.on('message', function(topic, message) {
         const msg = message.toString();
         if (topic === topicState) updateAdminUI(msg);
+        // Historique partage recu depuis le cloud (retained)
+        else if (topic === topicHistory) {
+          try {
+            const remoteHistory = JSON.parse(msg);
+            if (Array.isArray(remoteHistory) && remoteHistory.length > 0) {
+              // Fusionner : garder tous les codes uniques, prendre le statut le plus recent
+              const merged = new Map();
+              // D'abord les codes distants
+              remoteHistory.forEach(c => merged.set(c.code, c));
+              // Puis les locaux (ecrase si plus recent)
+              codeHistory.forEach(c => {
+                const existing = merged.get(c.code);
+                if (!existing) merged.set(c.code, c);
+                else if (c.status === 'used' && existing.status === 'waiting') merged.set(c.code, c);
+              });
+              codeHistory = Array.from(merged.values());
+              // Trier par time decroissant
+              try { localStorage.setItem('porte_codeHistory', JSON.stringify(codeHistory)); } catch(e) {}
+              updateCodeList();
+            }
+          } catch(e) {}
+        }
         // Un code vient d'etre utilise → mettre a jour l'historique
         else if (topic === topicCodeUsed) markCodeUsed(msg);
         // Un autre admin a cree un code → l'ajouter a notre historique
@@ -511,7 +539,7 @@
     function clearHistory() {
       if (confirm('Vider tout l\'historique des codes ?')) {
         codeHistory = [];
-        saveHistory();
+        saveHistory(); // publie aussi sur MQTT retained → vide sur tous les appareils
         updateCodeList();
         document.getElementById('generatedCode').classList.add('hidden');
       }
