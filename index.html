@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telecommande Porte</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .container {
+      text-align: center;
+      padding: 40px 30px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 24px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+      max-width: 400px;
+      width: 90%;
+    }
+    .icon { font-size: 5em; margin-bottom: 15px; transition: all 0.3s; }
+    h1 { font-size: 1.6em; margin-bottom: 5px; }
+    .subtitle { opacity: 0.5; font-size: 0.85em; margin-bottom: 25px; }
+    .status {
+      font-size: 1.1em;
+      margin: 20px 0;
+      padding: 12px 20px;
+      border-radius: 12px;
+      transition: all 0.3s;
+    }
+    .status.on { background: rgba(0,255,100,0.15); color: #00ff64; }
+    .status.off { background: rgba(255,50,50,0.15); color: #ff5050; }
+    .status.waiting { background: rgba(255,200,0,0.15); color: #ffc800; }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 18px;
+      font-size: 1.2em;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: white;
+      margin: 10px 0;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-on { background: linear-gradient(135deg, #00b09b, #96c93d); }
+    .btn-on:hover { box-shadow: 0 5px 25px rgba(0,176,155,0.4); }
+    .btn-off { background: linear-gradient(135deg, #e53935, #e35d5b); }
+    .btn-off:hover { box-shadow: 0 5px 25px rgba(229,57,53,0.4); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .connexion {
+      margin-top: 25px;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 0.8em;
+    }
+    .connexion.ok { background: rgba(0,255,100,0.1); color: #00ff64; }
+    .connexion.ko { background: rgba(255,50,50,0.1); color: #ff5050; }
+    .connexion.loading { background: rgba(255,200,0,0.1); color: #ffc800; }
+
+    .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .dot.green { background: #00ff64; }
+    .dot.red { background: #ff5050; }
+    .dot.yellow { background: #ffc800; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon" id="icon">&#128274;</div>
+    <h1>Porte Connectee</h1>
+    <div class="subtitle">Controle a distance mondial</div>
+
+    <div class="status waiting" id="status">Connexion en cours...</div>
+
+    <button class="btn btn-on" id="btnOn" onclick="send('ON')" disabled>OUVRIR</button>
+    <button class="btn btn-off" id="btnOff" onclick="send('OFF')" disabled>FERMER</button>
+
+    <div class="connexion loading" id="connexion">
+      <span class="dot yellow" id="dot"></span>
+      Connexion au serveur...
+    </div>
+  </div>
+
+  <!-- MQTT.js via CDN - fonctionne dans le navigateur -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    // Topics MQTT (doivent correspondre au code Arduino)
+    const topicCmd   = 'porte-vincent-2026/commande';
+    const topicState = 'porte-vincent-2026/etat';
+
+    const iconEl     = document.getElementById('icon');
+    const statusEl   = document.getElementById('status');
+    const connexEl   = document.getElementById('connexion');
+    const dotEl      = document.getElementById('dot');
+    const btnOn      = document.getElementById('btnOn');
+    const btnOff     = document.getElementById('btnOff');
+
+    let currentState = 'OFF';
+
+    // Connexion au broker MQTT via WebSocket
+    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+      clientId: 'web-porte-' + Math.random().toString(36).substr(2, 8),
+      clean: true
+    });
+
+    client.on('connect', function () {
+      console.log('Connecte au broker MQTT !');
+      connexEl.className = 'connexion ok';
+      connexEl.innerHTML = '<span class="dot green"></span> Connecte au cloud';
+      btnOn.disabled = false;
+      btnOff.disabled = false;
+
+      // Écouter l'état envoyé par l'Arduino
+      client.subscribe(topicState);
+    });
+
+    client.on('message', function (topic, message) {
+      const msg = message.toString();
+      console.log('Recu:', topic, msg);
+
+      if (topic === topicState) {
+        currentState = msg;
+        updateUI();
+      }
+    });
+
+    client.on('error', function (err) {
+      console.error('Erreur MQTT:', err);
+      connexEl.className = 'connexion ko';
+      connexEl.innerHTML = '<span class="dot red"></span> Erreur de connexion';
+    });
+
+    client.on('offline', function () {
+      connexEl.className = 'connexion ko';
+      connexEl.innerHTML = '<span class="dot red"></span> Deconnecte';
+      btnOn.disabled = true;
+      btnOff.disabled = true;
+    });
+
+    function send(command) {
+      console.log('Envoi:', command);
+      client.publish(topicCmd, command);
+    }
+
+    function updateUI() {
+      if (currentState === 'ON') {
+        iconEl.innerHTML = '&#128275;';
+        statusEl.className = 'status on';
+        statusEl.textContent = 'Etat : OUVERT (LED allumee)';
+      } else {
+        iconEl.innerHTML = '&#128274;';
+        statusEl.className = 'status off';
+        statusEl.textContent = 'Etat : FERME (LED eteinte)';
+      }
+    }
+
+    updateUI();
+  </script>
+</body>
+</html>
