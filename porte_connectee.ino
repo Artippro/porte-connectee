@@ -12,6 +12,24 @@
 
 #include <WiFiS3.h>
 #include <ArduinoMqttClient.h>
+#include "Arduino_LED_Matrix.h"
+
+ArduinoLEDMatrix matrix;
+
+// Cadenas FERME (12x8)
+const uint32_t lockClosed[][4] = {
+  { 0x00000006, 0x60990990, 0xFF0FF006, 0x60000000 }
+};
+
+// Cadenas OUVERT (12x8)
+const uint32_t lockOpen[][4] = {
+  { 0x00600600, 0x00990990, 0xFF0FF006, 0x60000000 }
+};
+
+// WiFi loading animation
+const uint32_t wifiIcon[][4] = {
+  { 0x01801E07, 0x80000180, 0x00000000, 0x00000000 }
+};
 
 // ===== À MODIFIER AVEC TON WIFI =====
 char ssid[] = "iPhone du bg";
@@ -127,7 +145,9 @@ bool useCode(String code) {
 void openDoorTemporary() {
   ledState = true;
   digitalWrite(LED_PIN, HIGH);
-  Serial.println(">> PORTE OUVERTE (code jetable) - fermeture auto dans 5s");
+  matrix.loadSequence(lockOpen);
+  matrix.play(true);
+  Serial.println(">> PORTE OUVERTE (code jetable) - Cadenas OUVERT - fermeture auto 5s");
 
   // Envoyer l'état
   mqttClient.beginMessage(topicState);
@@ -154,15 +174,19 @@ void onMqttMessage(int messageSize) {
   if (topic == String(topicCmd)) {
     if (message == "ON") {
       ledState = true;
-      autoCloseTime = 0; // pas de fermeture auto en mode admin
+      autoCloseTime = 0;
       digitalWrite(LED_PIN, HIGH);
-      Serial.println(">> LED ALLUMEE (admin)");
+      matrix.loadSequence(lockOpen);
+      matrix.play(true);
+      Serial.println(">> LED ALLUMEE (admin) - Cadenas OUVERT");
     }
     else if (message == "OFF") {
       ledState = false;
       autoCloseTime = 0;
       digitalWrite(LED_PIN, LOW);
-      Serial.println(">> LED ETEINTE (admin)");
+      matrix.loadSequence(lockClosed);
+      matrix.play(true);
+      Serial.println(">> LED ETEINTE (admin) - Cadenas FERME");
     }
     mqttClient.beginMessage(topicState);
     mqttClient.print(ledState ? "ON" : "OFF");
@@ -200,11 +224,19 @@ void setup() {
   delay(1000);
   Serial.println("\n=== Porte Connectee - Codes Jetables ===");
 
+  matrix.begin();
+  matrix.loadSequence(wifiIcon);
+  matrix.play(true);  // animation WiFi pendant connexion
+
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
   connectWiFi();
   connectMQTT();
+
+  // Afficher cadenas ferme au demarrage
+  matrix.loadSequence(lockClosed);
+  matrix.play(true);
 
   mqttClient.onMessage(onMqttMessage);
 }
@@ -224,7 +256,9 @@ void loop() {
     autoCloseTime = 0;
     ledState = false;
     digitalWrite(LED_PIN, LOW);
-    Serial.println(">> FERMETURE AUTO (5s ecoulees)");
+    matrix.loadSequence(lockClosed);
+    matrix.play(true);
+    Serial.println(">> FERMETURE AUTO (5s ecoulees) - Cadenas FERME");
     mqttClient.beginMessage(topicState);
     mqttClient.print("OFF");
     mqttClient.endMessage();

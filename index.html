@@ -321,6 +321,7 @@
       <span class="copy-hint">Appuyer pour copier</span>
     </div>
     <div class="code-list" id="codeList"></div>
+    <div class="back-link" onclick="clearHistory()" style="margin-top:10px;color:rgba(255,50,50,0.4);">🗑 Vider l'historique</div>
 
     <div class="back-link" onclick="location.reload()">🚪 Deconnexion</div>
   </div>
@@ -343,7 +344,16 @@
     let guestClient = null;
 
     // Historique des codes : { code: '123456', status: 'waiting'|'used', time: '14:32' }
+    // Charge depuis localStorage si dispo
     let codeHistory = [];
+    try {
+      const saved = localStorage.getItem('porte_codeHistory');
+      if (saved) codeHistory = JSON.parse(saved);
+    } catch(e) {}
+
+    function saveHistory() {
+      try { localStorage.setItem('porte_codeHistory', JSON.stringify(codeHistory)); } catch(e) {}
+    }
 
     // ===== NAVIGATION =====
     function showScreen(id) {
@@ -373,6 +383,7 @@
     function checkPin() {
       if (pinInput === CODE_PIN) {
         showScreen('controlScreen');
+        updateCodeList(); // Afficher l'historique sauvegarde
         connectAdminMQTT();
       } else {
         attempts++;
@@ -419,6 +430,7 @@
           if (!exists) {
             const now = new Date();
             codeHistory.unshift({ code: msg, status: 'waiting', time: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'autre admin' });
+            saveHistory();
             updateCodeList();
             showNotif('📥 Nouveau code cree par un autre admin : ' + msg);
           }
@@ -456,6 +468,7 @@
 
       // Ajouter en haut de l'historique
       codeHistory.unshift({ code: code, status: 'waiting', time: time, from: 'moi' });
+      saveHistory();
 
       // Envoyer le code a l'Arduino
       if (client) client.publish(topicAddCode, code);
@@ -490,8 +503,18 @@
         const now = new Date();
         codeHistory.unshift({ code: code, status: 'used', time: '??:??', usedAt: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'inconnu' });
       }
+      saveHistory();
       updateCodeList();
       showNotif('🔓 Code ' + code + ' utilise ! Porte ouverte');
+    }
+
+    function clearHistory() {
+      if (confirm('Vider tout l\'historique des codes ?')) {
+        codeHistory = [];
+        saveHistory();
+        updateCodeList();
+        document.getElementById('generatedCode').classList.add('hidden');
+      }
     }
 
     function showNotif(text) {
