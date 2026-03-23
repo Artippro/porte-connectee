@@ -292,33 +292,32 @@
     }
     .modal-input:focus { border-color: #667eea; }
     .modal-input::placeholder { color: rgba(255,255,255,0.3); }
-    .modal-select {
+    .date-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .date-field { flex: 1; }
+    .date-label {
+      font-size: 0.75em;
+      opacity: 0.6;
+      margin-bottom: 5px;
+      text-align: left;
+    }
+    .modal-date {
       width: 100%;
-      padding: 14px;
+      padding: 12px 10px;
       border-radius: 12px;
       border: 2px solid rgba(255,255,255,0.15);
       background: rgba(30,30,60,0.95);
       color: white;
-      font-size: 1em;
-      margin-bottom: 12px;
+      font-size: 0.9em;
       outline: none;
       cursor: pointer;
       transition: border-color 0.2s;
-      appearance: none;
-      -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='rgba(255,255,255,0.5)' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 14px center;
-      padding-right: 36px;
+      color-scheme: dark;
     }
-    .modal-select:focus { border-color: #667eea; }
-    .modal-select option { background: #1a1a2e; color: white; }
-    .duration-label {
-      font-size: 0.8em;
-      opacity: 0.6;
-      margin-bottom: 6px;
-      text-align: left;
-    }
+    .modal-date:focus { border-color: #667eea; }
     .modal-btns { display: flex; gap: 10px; margin-top: 8px; }
     .modal-btns button {
       flex: 1;
@@ -464,12 +463,16 @@
       <h2>👑 Nouvel Admin</h2>
       <input class="modal-input" id="newAdminName" type="text" placeholder="Nom (ex: Thomas)" maxlength="20" autocomplete="off">
       <input class="modal-input" id="newAdminPin" type="tel" placeholder="Code PIN (4 chiffres)" maxlength="4" autocomplete="off">
-      <div class="duration-label">⏱ Duree d'acces</div>
-      <select class="modal-select" id="newAdminDuration">
-        <option value="604800000">1 Semaine</option>
-        <option value="7776000000">3 Mois</option>
-        <option value="31536000000">1 An</option>
-      </select>
+      <div class="date-row">
+        <div class="date-field">
+          <div class="date-label">📅 Acces du</div>
+          <input class="modal-date" id="newAdminStart" type="date">
+        </div>
+        <div class="date-field">
+          <div class="date-label">📅 Jusqu'au</div>
+          <input class="modal-date" id="newAdminEnd" type="date">
+        </div>
+      </div>
       <div class="modal-btns">
         <button class="btn-cancel" onclick="hideCreateAdminModal()">Annuler</button>
         <button class="btn-confirm" onclick="createAdmin()">Creer</button>
@@ -550,14 +553,18 @@
     }
 
     function formatAdminExpiry(admin) {
+      const fmt = ts => new Date(ts).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const now = Date.now();
+      if (admin.startsAt && admin.expiresAt) {
+        if (now < admin.startsAt) return '📅 Du ' + fmt(admin.startsAt) + ' au ' + fmt(admin.expiresAt) + ' (pas encore actif)';
+        if (now > admin.expiresAt) return '❌ Expire le ' + fmt(admin.expiresAt);
+        const days = Math.floor((admin.expiresAt - now) / 86400000);
+        return '📅 Jusqu\'au ' + fmt(admin.expiresAt) + ' (' + days + 'j restant' + (days > 1 ? 's' : '') + ')';
+      }
       if (!admin.expiresAt) return '';
-      const remaining = admin.expiresAt - Date.now();
+      const remaining = admin.expiresAt - now;
       if (remaining <= 0) return 'Acces expire';
       const days = Math.floor(remaining / 86400000);
-      if (days > 30) {
-        const months = Math.floor(days / 30);
-        return 'Expire dans ~' + months + ' mois';
-      }
       return 'Expire dans ' + days + ' jour' + (days > 1 ? 's' : '');
     }
 
@@ -597,8 +604,17 @@
       // Check created admins
       const admin = adminAccounts.find(a => a.pin === pinInput);
       if (admin) {
+        const now = Date.now();
+        // Verifier si l'acces n'a pas encore commence
+        if (admin.startsAt && now < admin.startsAt) {
+          for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'pin-dot error';
+          const startDate = new Date(admin.startsAt).toLocaleDateString('fr-FR');
+          document.getElementById('errorMsg').textContent = 'Acces actif a partir du ' + startDate;
+          setTimeout(() => { pinInput = ''; updateDots(); }, 1500);
+          return;
+        }
         // Verifier si l'acces est expire
-        if (admin.expiresAt && Date.now() > admin.expiresAt) {
+        if (admin.expiresAt && now > admin.expiresAt) {
           for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'pin-dot error';
           document.getElementById('errorMsg').textContent = 'Acces expire pour "' + admin.name + '"';
           setTimeout(() => { pinInput = ''; updateDots(); }, 1200);
@@ -821,8 +837,13 @@
       document.getElementById('createAdminModal').classList.remove('hidden');
       document.getElementById('newAdminName').value = '';
       document.getElementById('newAdminPin').value = '';
-      document.getElementById('newAdminDuration').value = '7776000000'; // 3 mois par defaut
       document.getElementById('modalError').textContent = '';
+      // Prefill: debut = aujourd'hui, fin = +3 mois
+      const today = new Date();
+      const in3months = new Date();
+      in3months.setMonth(in3months.getMonth() + 3);
+      document.getElementById('newAdminStart').value = today.toISOString().split('T')[0];
+      document.getElementById('newAdminEnd').value = in3months.toISOString().split('T')[0];
       document.getElementById('newAdminName').focus();
     }
     function hideCreateAdminModal() {
@@ -832,22 +853,25 @@
     function createAdmin() {
       const name = document.getElementById('newAdminName').value.trim();
       const pin = document.getElementById('newAdminPin').value.trim();
-      const duration = parseInt(document.getElementById('newAdminDuration').value);
+      const startVal = document.getElementById('newAdminStart').value;
+      const endVal = document.getElementById('newAdminEnd').value;
       const errEl = document.getElementById('modalError');
 
       if (!name) { errEl.textContent = 'Entre un nom'; return; }
       if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { errEl.textContent = 'Le PIN doit faire 4 chiffres'; return; }
       if (pin === SUPER_ADMIN_PIN) { errEl.textContent = 'Ce PIN est reserve au Super Admin'; return; }
       if (adminAccounts.find(a => a.pin === pin)) { errEl.textContent = 'Ce PIN est deja utilise'; return; }
+      if (!startVal || !endVal) { errEl.textContent = 'Choisis les dates de debut et fin'; return; }
 
-      const expiresAt = Date.now() + duration;
-      const durationLabel = document.getElementById('newAdminDuration').options[document.getElementById('newAdminDuration').selectedIndex].text;
+      const startsAt = new Date(startVal).getTime();
+      const expiresAt = new Date(endVal).getTime() + 86399999; // fin de journée
+      if (expiresAt <= startsAt) { errEl.textContent = 'La date de fin doit etre apres le debut'; return; }
 
-      adminAccounts.push({ pin: pin, name: name, expiresAt: expiresAt });
+      adminAccounts.push({ pin: pin, name: name, startsAt: startsAt, expiresAt: expiresAt });
       saveAdmins();
       updateAdminList();
       hideCreateAdminModal();
-      showNotif('✅ Admin "' + name + '" cree pour ' + durationLabel + ' (PIN: ' + pin + ')');
+      showNotif('✅ Admin "' + name + '" cree du ' + startVal + ' au ' + endVal);
     }
 
     function deleteAdmin(pin) {
@@ -870,10 +894,12 @@
       }
       let html = '<div style="opacity:0.5;margin-bottom:8px;margin-top:10px;">Admins actifs :</div>';
       adminAccounts.forEach(a => {
-        const expired = a.expiresAt && Date.now() > a.expiresAt;
+        const now = Date.now();
+        const notStarted = a.startsAt && now < a.startsAt;
+        const expired = a.expiresAt && now > a.expiresAt;
         const expiryText = formatAdminExpiry(a);
-        const daysLeft = a.expiresAt ? Math.floor((a.expiresAt - Date.now()) / 86400000) : 999;
-        const expiryCls = expired ? 'expired' : (daysLeft <= 7 ? 'soon' : 'ok');
+        const daysLeft = a.expiresAt ? Math.floor((a.expiresAt - now) / 86400000) : 999;
+        const expiryCls = expired ? 'expired' : (notStarted ? 'soon' : (daysLeft <= 7 ? 'soon' : 'ok'));
         html += '<div class="admin-item' + (expired ? ' expired-admin' : '') + '">'
           + '<div class="admin-info">'
           + '<div class="admin-name">🔑 ' + a.name + (expired ? ' <span style="color:#ff5050;font-size:0.8em;">(Expire)</span>' : '') + '</div>'
