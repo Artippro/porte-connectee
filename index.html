@@ -202,8 +202,11 @@
     .code-item .badge { font-size: 0.85em; }
     .code-item .badge.waiting { color: #ffc800; }
     .code-item .badge.used { color: #00ff64; }
+    .code-item .badge.expired { color: #ff5050; }
     .code-item.used { opacity: 0.5; }
     .code-item.used span:first-child { text-decoration: line-through; }
+    .code-item.expired { opacity: 0.4; }
+    .code-item.expired span:first-child { text-decoration: line-through; color: #ff5050; }
     .btn-delete {
       background: rgba(255,50,50,0.2);
       border: none;
@@ -289,6 +292,33 @@
     }
     .modal-input:focus { border-color: #667eea; }
     .modal-input::placeholder { color: rgba(255,255,255,0.3); }
+    .modal-select {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.15);
+      background: rgba(30,30,60,0.95);
+      color: white;
+      font-size: 1em;
+      margin-bottom: 12px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='rgba(255,255,255,0.5)' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+    .modal-select:focus { border-color: #667eea; }
+    .modal-select option { background: #1a1a2e; color: white; }
+    .duration-label {
+      font-size: 0.8em;
+      opacity: 0.6;
+      margin-bottom: 6px;
+      text-align: left;
+    }
     .modal-btns { display: flex; gap: 10px; margin-top: 8px; }
     .modal-btns button {
       flex: 1;
@@ -314,9 +344,14 @@
       border-radius: 10px;
       text-align: left;
     }
+    .admin-item.expired-admin { opacity: 0.4; border: 1px solid rgba(255,50,50,0.3); }
     .admin-item .admin-info { flex: 1; }
     .admin-item .admin-name { font-weight: 700; font-size: 0.95em; }
     .admin-item .admin-pin { font-family: monospace; opacity: 0.5; font-size: 0.8em; letter-spacing: 2px; }
+    .admin-item .admin-expiry { font-size: 0.75em; margin-top: 3px; }
+    .admin-item .admin-expiry.ok { color: #00ff64; }
+    .admin-item .admin-expiry.soon { color: #ffc800; }
+    .admin-item .admin-expiry.expired { color: #ff5050; }
   </style>
 </head>
 <body>
@@ -404,7 +439,7 @@
     </div>
 
     <!-- SECTION CODES JETABLES -->
-    <div class="section-title">🎫 Codes Jetables</div>
+    <div class="section-title">🎫 Codes Jetables <span style="font-size:0.8em;opacity:0.6;">(valables 12h)</span></div>
     <button class="btn btn-generate" onclick="generateCode()">Generer un code jetable</button>
     <div class="generated-code hidden" id="generatedCode" onclick="copyCode()">
       <span id="codeText"></span>
@@ -429,6 +464,12 @@
       <h2>👑 Nouvel Admin</h2>
       <input class="modal-input" id="newAdminName" type="text" placeholder="Nom (ex: Thomas)" maxlength="20" autocomplete="off">
       <input class="modal-input" id="newAdminPin" type="tel" placeholder="Code PIN (4 chiffres)" maxlength="4" autocomplete="off">
+      <div class="duration-label">⏱ Duree d'acces</div>
+      <select class="modal-select" id="newAdminDuration">
+        <option value="604800000">1 Semaine</option>
+        <option value="7776000000">3 Mois</option>
+        <option value="31536000000">1 An</option>
+      </select>
       <div class="modal-btns">
         <button class="btn-cancel" onclick="hideCreateAdminModal()">Annuler</button>
         <button class="btn-confirm" onclick="createAdmin()">Creer</button>
@@ -444,6 +485,8 @@
     const SUPER_ADMIN_NAME = 'Super Admin';
     // ============================
 
+    const CODE_EXPIRY_MS = 12 * 60 * 60 * 1000; // 12 heures en ms
+
     // MQTT topics
     const topicCmd        = 'porte-vincent-2026/commande';
     const topicState      = 'porte-vincent-2026/etat';
@@ -453,7 +496,7 @@
     const topicCodeUsed   = 'porte-vincent-2026/codeused';
     const topicDelCode    = 'porte-vincent-2026/delcode';
     const topicHistory    = 'porte-vincent-2026/history';
-    const topicAdmins     = 'porte-vincent-2026/admins';  // retained: liste des admins
+    const topicAdmins     = 'porte-vincent-2026/admins';
 
     let client = null;
     let guestClient = null;
@@ -461,7 +504,7 @@
     let currentUserName = '';
 
     // ===== ADMIN ACCOUNTS =====
-    // { pin: '5678', name: 'Thomas' }
+    // { pin, name, expiresAt (timestamp ms) }
     let adminAccounts = [];
     try {
       const saved = localStorage.getItem('porte_admins');
@@ -476,6 +519,7 @@
     }
 
     // ===== CODE HISTORY =====
+    // { code, status, time, from, createdAt (timestamp ms), usedAt }
     let codeHistory = [];
     try {
       const saved = localStorage.getItem('porte_codeHistory');
@@ -487,6 +531,34 @@
       if (client && client.connected) {
         client.publish(topicHistory, JSON.stringify(codeHistory), { retain: true });
       }
+    }
+
+    function isCodeExpired(entry) {
+      if (!entry.createdAt) return false; // ancien code sans timestamp = pas d'expiry
+      return Date.now() > entry.createdAt + CODE_EXPIRY_MS;
+    }
+
+    function formatExpiry(entry) {
+      if (!entry.createdAt) return '';
+      const expiresAt = entry.createdAt + CODE_EXPIRY_MS;
+      const remaining = expiresAt - Date.now();
+      if (remaining <= 0) return 'Expire';
+      const h = Math.floor(remaining / 3600000);
+      const m = Math.floor((remaining % 3600000) / 60000);
+      if (h > 0) return 'Expire dans ' + h + 'h' + (m > 0 ? m + 'm' : '');
+      return 'Expire dans ' + m + 'min';
+    }
+
+    function formatAdminExpiry(admin) {
+      if (!admin.expiresAt) return '';
+      const remaining = admin.expiresAt - Date.now();
+      if (remaining <= 0) return 'Acces expire';
+      const days = Math.floor(remaining / 86400000);
+      if (days > 30) {
+        const months = Math.floor(days / 30);
+        return 'Expire dans ~' + months + ' mois';
+      }
+      return 'Expire dans ' + days + ' jour' + (days > 1 ? 's' : '');
     }
 
     // ===== NAVIGATION =====
@@ -525,6 +597,13 @@
       // Check created admins
       const admin = adminAccounts.find(a => a.pin === pinInput);
       if (admin) {
+        // Verifier si l'acces est expire
+        if (admin.expiresAt && Date.now() > admin.expiresAt) {
+          for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'pin-dot error';
+          document.getElementById('errorMsg').textContent = 'Acces expire pour "' + admin.name + '"';
+          setTimeout(() => { pinInput = ''; updateDots(); }, 1200);
+          return;
+        }
         isSuperAdmin = false;
         currentUserName = admin.name;
         loginSuccess();
@@ -544,10 +623,8 @@
 
     function loginSuccess() {
       showScreen('controlScreen');
-      // Welcome message
       document.getElementById('welcomeName').textContent = currentUserName;
       document.getElementById('welcomeRole').textContent = isSuperAdmin ? '👑 Super Admin' : '🔑 Admin';
-      // Show/hide super admin section
       document.getElementById('superAdminSection').classList.toggle('hidden', !isSuperAdmin);
       updateCodeList();
       updateAdminList();
@@ -578,7 +655,6 @@
       client.on('message', function(topic, message) {
         const msg = message.toString();
         if (topic === topicState) updateAdminUI(msg);
-        // Historique partage recu depuis le cloud (retained)
         else if (topic === topicHistory) {
           try {
             const remoteHistory = JSON.parse(msg);
@@ -596,7 +672,6 @@
             }
           } catch(e) {}
         }
-        // Admin accounts synced from cloud
         else if (topic === topicAdmins) {
           try {
             const remoteAdmins = JSON.parse(msg);
@@ -607,14 +682,12 @@
             }
           } catch(e) {}
         }
-        // Un code vient d'etre utilise
         else if (topic === topicCodeUsed) markCodeUsed(msg);
-        // Un autre admin a cree un code
         else if (topic === topicAddCode) {
           const exists = codeHistory.find(c => c.code === msg);
           if (!exists) {
             const now = new Date();
-            codeHistory.unshift({ code: msg, status: 'waiting', time: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'autre admin' });
+            codeHistory.unshift({ code: msg, status: 'waiting', time: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'autre admin', createdAt: Date.now() });
             saveHistory();
             updateCodeList();
             showNotif('📥 Nouveau code cree par un autre admin : ' + msg);
@@ -650,7 +723,7 @@
       const code = String(Math.floor(100000 + Math.random() * 900000));
       const now = new Date();
       const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-      codeHistory.unshift({ code: code, status: 'waiting', time: time, from: currentUserName });
+      codeHistory.unshift({ code: code, status: 'waiting', time: time, from: currentUserName, createdAt: Date.now() });
       saveHistory();
       if (client) client.publish(topicAddCode, code);
       const el = document.getElementById('generatedCode');
@@ -677,7 +750,7 @@
         entry.usedAt = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
       } else {
         const now = new Date();
-        codeHistory.unshift({ code: code, status: 'used', time: '??:??', usedAt: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'inconnu' });
+        codeHistory.unshift({ code: code, status: 'used', time: '??:??', usedAt: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), from: 'inconnu', createdAt: Date.now() });
       }
       saveHistory();
       updateCodeList();
@@ -721,11 +794,19 @@
       let html = '<div style="opacity:0.5;margin-bottom:8px;">Historique des codes :</div>';
       codeHistory.forEach(c => {
         const isUsed = c.status === 'used';
-        const badge = isUsed
-          ? '<span class="badge used">✅ Utilise a ' + c.usedAt + '</span>'
-          : '<span class="badge waiting">⏳ En attente</span>';
+        const expired = !isUsed && isCodeExpired(c);
+        let badge;
+        if (isUsed) {
+          badge = '<span class="badge used">✅ Utilise a ' + c.usedAt + '</span>';
+        } else if (expired) {
+          badge = '<span class="badge expired">❌ Expire</span>';
+        } else {
+          const expiryInfo = formatExpiry(c);
+          badge = '<span class="badge waiting">⏳ ' + (expiryInfo || 'En attente') + '</span>';
+        }
         const from = c.from ? ' <span style="opacity:0.4;font-size:0.8em;">(' + c.from + ')</span>' : '';
-        html += '<div class="code-item' + (isUsed ? ' used' : '') + '">'
+        const cls = isUsed ? ' used' : (expired ? ' expired' : '');
+        html += '<div class="code-item' + cls + '">'
           + '<span>' + c.code + '</span>'
           + '<div>' + badge + from
           + '<button class="btn-delete" onclick="deleteCodeFromHistory(\'' + c.code + '\')" title="Supprimer">🗑</button>'
@@ -740,6 +821,7 @@
       document.getElementById('createAdminModal').classList.remove('hidden');
       document.getElementById('newAdminName').value = '';
       document.getElementById('newAdminPin').value = '';
+      document.getElementById('newAdminDuration').value = '7776000000'; // 3 mois par defaut
       document.getElementById('modalError').textContent = '';
       document.getElementById('newAdminName').focus();
     }
@@ -750,6 +832,7 @@
     function createAdmin() {
       const name = document.getElementById('newAdminName').value.trim();
       const pin = document.getElementById('newAdminPin').value.trim();
+      const duration = parseInt(document.getElementById('newAdminDuration').value);
       const errEl = document.getElementById('modalError');
 
       if (!name) { errEl.textContent = 'Entre un nom'; return; }
@@ -757,11 +840,14 @@
       if (pin === SUPER_ADMIN_PIN) { errEl.textContent = 'Ce PIN est reserve au Super Admin'; return; }
       if (adminAccounts.find(a => a.pin === pin)) { errEl.textContent = 'Ce PIN est deja utilise'; return; }
 
-      adminAccounts.push({ pin: pin, name: name });
+      const expiresAt = Date.now() + duration;
+      const durationLabel = document.getElementById('newAdminDuration').options[document.getElementById('newAdminDuration').selectedIndex].text;
+
+      adminAccounts.push({ pin: pin, name: name, expiresAt: expiresAt });
       saveAdmins();
       updateAdminList();
       hideCreateAdminModal();
-      showNotif('✅ Admin "' + name + '" cree (PIN: ' + pin + ')');
+      showNotif('✅ Admin "' + name + '" cree pour ' + durationLabel + ' (PIN: ' + pin + ')');
     }
 
     function deleteAdmin(pin) {
@@ -784,10 +870,15 @@
       }
       let html = '<div style="opacity:0.5;margin-bottom:8px;margin-top:10px;">Admins actifs :</div>';
       adminAccounts.forEach(a => {
-        html += '<div class="admin-item">'
+        const expired = a.expiresAt && Date.now() > a.expiresAt;
+        const expiryText = formatAdminExpiry(a);
+        const daysLeft = a.expiresAt ? Math.floor((a.expiresAt - Date.now()) / 86400000) : 999;
+        const expiryCls = expired ? 'expired' : (daysLeft <= 7 ? 'soon' : 'ok');
+        html += '<div class="admin-item' + (expired ? ' expired-admin' : '') + '">'
           + '<div class="admin-info">'
-          + '<div class="admin-name">🔑 ' + a.name + '</div>'
+          + '<div class="admin-name">🔑 ' + a.name + (expired ? ' <span style="color:#ff5050;font-size:0.8em;">(Expire)</span>' : '') + '</div>'
           + '<div class="admin-pin">PIN: ' + a.pin + '</div>'
+          + (expiryText ? '<div class="admin-expiry ' + expiryCls + '">' + expiryText + '</div>' : '')
           + '</div>'
           + '<button class="btn-delete" onclick="deleteAdmin(\'' + a.pin + '\')" title="Supprimer">🗑</button>'
           + '</div>';
@@ -819,7 +910,6 @@
         connexEl.className = 'connexion ok';
         connexEl.innerHTML = '<span class="dot green"></span> Connecte';
         guestClient.subscribe(topicCodeResult);
-        // Also subscribe to admins topic so we have the list ready for PIN check
         guestClient.subscribe(topicAdmins);
       });
       guestClient.on('message', function(topic, message) {
@@ -832,7 +922,6 @@
             resultEl.innerHTML = '<div class="result-msg fail">❌ Code invalide ou deja utilise</div>';
           }
         }
-        // Sync admin accounts even before login (for PIN check)
         else if (topic === topicAdmins) {
           try {
             const remoteAdmins = JSON.parse(message.toString());
@@ -851,12 +940,19 @@
 
     function submitGuestCode() {
       if (guestInput.length !== 6) return;
+
+      // Verifier si le code est expire (12h) cote client
+      const entry = codeHistory.find(c => c.code === guestInput && c.status === 'waiting');
+      if (entry && isCodeExpired(entry)) {
+        document.getElementById('guestResult').innerHTML = '<div class="result-msg fail">❌ Ce code a expire (valable 12h)</div>';
+        return;
+      }
+
       document.getElementById('guestResult').innerHTML = '<div class="result-msg checking">⏳ Verification...</div>';
       if (guestClient) guestClient.publish(topicUseCode, guestInput);
     }
 
     // ===== PRE-LOAD ADMIN LIST =====
-    // Connect briefly to get admin list for PIN verification (before login)
     (function preloadAdmins() {
       const preClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
         clientId: 'preload-' + Math.random().toString(36).substr(2, 8),
@@ -874,11 +970,9 @@
               try { localStorage.setItem('porte_admins', JSON.stringify(adminAccounts)); } catch(e) {}
             }
           } catch(e) {}
-          // Got the list, disconnect preload client
           preClient.end();
         }
       });
-      // Timeout: if no retained message in 5s, disconnect
       setTimeout(() => { try { preClient.end(); } catch(e) {} }, 5000);
     })();
   </script>
