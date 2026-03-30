@@ -787,7 +787,15 @@
     }
 
     function markCodeUsed(code) {
-      codeHistory = codeHistory.filter(c => c.code !== code);
+      const entry = codeHistory.find(c => c.code === code);
+      const now = new Date();
+      const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+      if (entry) {
+        entry.status = 'used';
+        entry.usedAt = timeStr;
+      } else {
+        codeHistory.unshift({ code: code, status: 'used', time: '??:??', usedAt: timeStr, from: 'inconnu', createdAt: Date.now() });
+      }
       saveHistory();
       updateCodeList();
       showNotif('🔓 Code ' + code + ' utilise ! Porte ouverte');
@@ -827,28 +835,46 @@
     function updateCodeList() {
       const el = document.getElementById('codeList');
       if (codeHistory.length === 0) { el.innerHTML = ''; return; }
-      let html = '<div style="opacity:0.5;margin-bottom:8px;">Historique des codes :</div>';
-      codeHistory.forEach(c => {
-        const isUsed = c.status === 'used';
-        const expired = !isUsed && isCodeExpired(c);
-        let badge;
-        if (isUsed) {
-          badge = '<span class="badge used">✅ Utilise a ' + c.usedAt + '</span>';
-        } else if (expired) {
-          badge = '<span class="badge expired">❌ Expire</span>';
-        } else {
-          const expiryInfo = formatExpiry(c);
-          badge = '<span class="badge waiting">⏳ ' + (expiryInfo || 'En attente') + '</span>';
-        }
-        const from = c.from ? ' <span style="opacity:0.4;font-size:0.8em;">(' + c.from + ')</span>' : '';
-        const cls = isUsed ? ' used' : (expired ? ' expired' : '');
-        html += '<div class="code-item' + cls + '">'
-          + '<span>' + c.code + '</span>'
-          + '<div>' + badge + from
-          + '<button class="btn-delete" onclick="deleteCodeFromHistory(\'' + c.code + '\')" title="Supprimer">🗑</button>'
-          + '</div>'
-          + '</div>';
-      });
+      const active = codeHistory.filter(c => c.status !== 'used');
+      const used = codeHistory.filter(c => c.status === 'used');
+      let html = '';
+
+      if (active.length > 0) {
+        html += '<div style="opacity:0.5;margin-bottom:8px;">Codes en attente :</div>';
+        active.forEach(c => {
+          const expired = isCodeExpired(c);
+          let badge;
+          if (expired) {
+            badge = '<span class="badge expired">❌ Expire</span>';
+          } else {
+            const expiryInfo = formatExpiry(c);
+            badge = '<span class="badge waiting">⏳ ' + (expiryInfo || 'En attente') + '</span>';
+          }
+          const from = c.from ? ' <span style="opacity:0.4;font-size:0.8em;">(' + c.from + ')</span>' : '';
+          const cls = expired ? ' expired' : '';
+          html += '<div class="code-item' + cls + '">'
+            + '<span>' + c.code + '</span>'
+            + '<div>' + badge + from
+            + '<button class="btn-delete" onclick="deleteCodeFromHistory('' + c.code + '')" title="Supprimer">🗑</button>'
+            + '</div>'
+            + '</div>';
+        });
+      }
+
+      if (used.length > 0) {
+        html += '<div style="opacity:0.5;margin:14px 0 8px 0;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">Codes utilisés :</div>';
+        used.forEach(c => {
+          const badge = '<span class="badge used">✅ Utilisé à ' + (c.usedAt || '??:??') + '</span>';
+          const from = c.from ? ' <span style="opacity:0.4;font-size:0.8em;">(' + c.from + ')</span>' : '';
+          html += '<div class="code-item used">'
+            + '<span>' + c.code + '</span>'
+            + '<div>' + badge + from
+            + '<button class="btn-delete" onclick="deleteCodeFromHistory('' + c.code + '')" title="Supprimer">🗑</button>'
+            + '</div>'
+            + '</div>';
+        });
+      }
+
       el.innerHTML = html;
     }
 
